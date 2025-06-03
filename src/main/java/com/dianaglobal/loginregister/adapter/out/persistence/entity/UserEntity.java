@@ -1,0 +1,35 @@
+package com.dianaglobal.loginregister.adapter.out.persistence.entity;
+
+import com.dianaglobal.loginregister.domain.model.User;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.UUID;
+
+@Document(collection = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UserEntity {
+
+    @Id
+    private UUID id;
+
+    private String email;
+    private String password;
+
+    public User toDomain() {
+        return new User(this.email, this.password);
+    }
+
+    public static UserEntity fromDomain(User user) {
+        return UserEntity.builder()
+                .id(UUID.randomUUID())
+                .email(user.getEmail())
+                .password(user.getPassword())
+                .build();
+    }
+}
