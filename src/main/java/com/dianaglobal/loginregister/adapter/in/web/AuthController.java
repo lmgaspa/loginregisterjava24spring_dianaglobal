@@ -1,16 +1,19 @@
 package com.dianaglobal.loginregister.adapter.in.web;
 
-import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
-import com.dianaglobal.loginregister.adapter.in.dto.LoginRequest;
-import com.dianaglobal.loginregister.adapter.in.dto.RegisterRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.*;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
+import com.dianaglobal.loginregister.application.service.RefreshTokenService;
 import com.dianaglobal.loginregister.application.service.UserService;
 import com.dianaglobal.loginregister.application.service.JwtService;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,7 +27,7 @@ public class AuthController {
     private final UserRepositoryPort userRepositoryPort;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
-
+    private final RefreshTokenService refreshTokenService;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
@@ -34,21 +37,37 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        return userRepositoryPort.findByEmail(request.email())
-                .filter(user -> passwordEncoder.matches(request.password(), user.getPassword()))
-                .<ResponseEntity<?>>map(user -> {
-                    String token = jwtService.generateToken(user.getEmail());
-                    return ResponseEntity.ok(new JwtResponse(token));
-                })
-                .orElse(ResponseEntity.status(401).body("Invalid credentials"));
+        var user = userRepositoryPort.findByEmail(request.email())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+        }
+
+        String jwt = jwtService.generateToken(user.getEmail());
+        String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
+
+        return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<User> profile(Authentication authentication) {
-        String email = authentication.getName();
-        return userService.findByEmail(email)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.status(404).build());
+    public ResponseEntity<ProfileResponseDTO> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
+        User user = userRepositoryPort.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return ResponseEntity.ok(new ProfileResponseDTO(user.getId(), user.getName(), user.getEmail()));
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<JwtResponse> refresh(@RequestBody RefreshRequestDTO body) {
+        if (!refreshTokenService.validate(body.refreshToken())) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = refreshTokenService.getEmailByToken(body.refreshToken());
+        String newToken = jwtService.generateToken(email);
+
+        return ResponseEntity.ok(new JwtResponse(newToken));
     }
 
 

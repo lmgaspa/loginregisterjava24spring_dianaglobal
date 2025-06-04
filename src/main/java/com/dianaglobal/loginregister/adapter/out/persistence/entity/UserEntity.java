@@ -28,9 +28,10 @@ public class UserEntity {
 
     public static UserEntity fromDomain(User user) {
         return UserEntity.builder()
-                .id(UUID.randomUUID())
+                .id(user.getId())
                 .email(user.getEmail())
                 .password(user.getPassword())
+                .name(user.getName())
                 .build();
     }
 }
