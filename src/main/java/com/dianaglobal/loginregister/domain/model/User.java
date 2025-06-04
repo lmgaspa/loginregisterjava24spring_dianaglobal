@@ -1,24 +1,22 @@
 package com.dianaglobal.loginregister.domain.model;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.UUID;
 
-@Getter
+@Data
+@NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Document(collection = "users")
 public class User {
-    private final UUID id;
-    private final String email;
-    private final String password;
 
-    public User(String email, String password) {
-        this.id = null;
-        this.email = email;
-        this.password = password;
-    }
+    @Id
+    private UUID id;
+    private String name;
+    private String email;
+    private String password;
 }
-
-

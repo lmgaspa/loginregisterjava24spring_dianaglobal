@@ -20,9 +20,10 @@ public class UserEntity {
 
     private String email;
     private String password;
+    private String name;
 
     public User toDomain() {
-        return new User(this.email, this.password);
+        return new User(UUID.randomUUID(), this.name, this.email, this.password);
     }
 
     public static UserEntity fromDomain(User user) {

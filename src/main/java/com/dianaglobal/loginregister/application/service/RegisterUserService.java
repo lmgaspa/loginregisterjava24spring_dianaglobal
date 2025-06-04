@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class RegisterUserService implements RegisterUserUseCase {
@@ -23,8 +25,12 @@ public class RegisterUserService implements RegisterUserUseCase {
             throw new RuntimeException("Email already in use");
         }
 
-        User user = new User(email, encoder.encode(password));
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(encoder.encode(password));
         userRepository.save(user);
+
     }
 }
-

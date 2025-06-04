@@ -6,3 +6,6 @@ spring:
       uri: mongodb+srv://luizgabi:${MONGODB_PASSWORD}@apiluiz.ihmeusb.mongodb.net/login-register?retryWrites=true&w=majority&appName=APILuiz
   application:
     name: login-register-app
+    jwt:
+      secret=${JWT_SECRET}:
+
