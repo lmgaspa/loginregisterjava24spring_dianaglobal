@@ -1,30 +1,33 @@
-# DianaGlobal Auth API
+# 🔐 DianaGlobal Auth API
 
-Authentication API developed with **Spring Boot 3** using **JWT (JSON Web Token)** for secure authentication, following **Hexagonal Architecture (Ports & Adapters)**.
-
----
-
-## 🧱 Technologies Used
-
-- Java 24
-- Spring Boot 3.x
-- Spring Security 6+
-- JWT (via `io.jsonwebtoken`)
-- Lombok
-- Maven
-- Swagger/OpenAPI 3
-- Hexagonal Architecture (Clean Architecture)
-- Database: PostgreSQL or MongoDB (customizable)
+Autenticação segura com **Spring Boot 3** e **JWT**, baseada em **Arquitetura Hexagonal (Ports & Adapters)**.  
+Ideal para sistemas como **exchanges de criptomoedas**, **painéis administrativos** ou **aplicações modernas com autenticação robusta**.
 
 ---
 
-## 🚀 Features
+## ⚙️ Tecnologias Utilizadas
 
-- User registration with password encryption
-- Login with JWT token generation
-- Protected endpoint requiring token authentication
-- Swagger integration for API documentation -> http://localhost:8080/swagger-ui/index.html
-- Middleware to intercept JWTs using custom filter
+- ☕ **Java 24**
+- 🚀 **Spring Boot 3.x**
+- 🔐 **Spring Security 6+**
+- 🪪 **JWT (via `io.jsonwebtoken`)**
+- 🧠 **Arquitetura Hexagonal** (Clean Architecture)
+- 💉 **Lombok**
+- 📦 **Maven**
+- 🧪 **Swagger/OpenAPI 3**
+- 💾 **Banco de Dados**: PostgreSQL ou MongoDB (personalizável)
+
+---
+
+## 🚀 Funcionalidades
+
+- ✅ Registro de usuários com criptografia de senha
+- ✅ Login com geração de **JWT + refresh token**
+- ✅ Endpoint `/profile` protegido com autenticação JWT
+- ✅ Rota `/refresh-token` para renovar tokens expirados
+- ✅ Logout com **revogação e blacklist de refresh tokens**
+- ✅ Middleware JWT com filtro customizado
+- ✅ Integração Swagger: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
 ---
 
