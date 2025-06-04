@@ -6,7 +6,7 @@ Authentication API developed with **Spring Boot 3** using **JWT (JSON Web Token)
 
 ## 🧱 Technologies Used
 
-- Java 21
+- Java 24
 - Spring Boot 3.x
 - Spring Security 6+
 - JWT (via `io.jsonwebtoken`)
