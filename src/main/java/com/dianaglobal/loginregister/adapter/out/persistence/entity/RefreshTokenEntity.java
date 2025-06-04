@@ -8,11 +8,19 @@ import java.util.Date;
 import java.util.UUID;
 
 @Document(collection = "refresh_tokens")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class RefreshTokenEntity {
+
     @Id
     private UUID id;
+
     private String email;
     private String token;
     private Date expiryDate;
+
+    private boolean revoked = false;
 }

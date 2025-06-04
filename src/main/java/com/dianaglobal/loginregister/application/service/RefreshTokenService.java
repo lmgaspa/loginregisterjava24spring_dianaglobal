@@ -15,18 +15,19 @@ public class RefreshTokenService {
     private final RefreshTokenRepository repository;
 
     public RefreshTokenEntity create(String email) {
-        RefreshTokenEntity token = new RefreshTokenEntity(
-                UUID.randomUUID(),
-                email,
-                UUID.randomUUID().toString(),
-                new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7) // 7 dias
-        );
+        RefreshTokenEntity token = RefreshTokenEntity.builder()
+                .id(UUID.randomUUID())
+                .email(email)
+                .token(UUID.randomUUID().toString())
+                .expiryDate(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7))
+                .revoked(false)
+                .build();
         return repository.save(token);
     }
 
     public boolean validate(String token) {
         return repository.findByToken(token)
-                .map(t -> t.getExpiryDate().after(new Date()))
+                .map(t -> !t.isRevoked() && t.getExpiryDate().after(new Date()))
                 .orElse(false);
     }
 
@@ -34,5 +35,12 @@ public class RefreshTokenService {
         return repository.findByToken(token)
                 .map(RefreshTokenEntity::getEmail)
                 .orElseThrow(() -> new RuntimeException("Token not found"));
+    }
+
+    public void revokeToken(String token) {
+        repository.findByToken(token).ifPresent(t -> {
+            t.setRevoked(true);
+            repository.save(t);
+        });
     }
 }

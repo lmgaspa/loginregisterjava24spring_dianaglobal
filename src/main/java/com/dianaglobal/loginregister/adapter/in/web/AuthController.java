@@ -10,6 +10,7 @@ import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -70,11 +71,23 @@ public class AuthController {
         return ResponseEntity.ok(new JwtResponse(newToken));
     }
 
-
     @GetMapping("/find-user")
     public ResponseEntity<?> findUser(@RequestParam String email) {
         return userService.findByEmail(email)
                 .map(user -> ResponseEntity.ok("User found: " + user.getEmail()))
                 .orElse(ResponseEntity.status(404).body("User not found"));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody RefreshRequestDTO body) {
+        refreshTokenService.revokeToken(body.refreshToken());
+        return ResponseEntity.ok("Logged out successfully");
+    }
+
+    @PostMapping("/revoke-refresh")
+    public ResponseEntity<?> revokeRefresh(@RequestBody RefreshRequestDTO body) {
+        refreshTokenService.revokeToken(body.refreshToken());
+        return ResponseEntity.ok("Refresh token revoked.");
     }
 }
