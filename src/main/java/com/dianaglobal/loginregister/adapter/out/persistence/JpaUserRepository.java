@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -23,5 +24,16 @@ public class JpaUserRepository implements UserRepositoryPort {
     public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(UserEntity::toDomain);
     }
-}
 
+    @Override
+    public Optional<User> findById(UUID id) {
+        return repository.findById(id).map(UserEntity::toDomain);
+    }
+
+    @Override
+    public void updatePassword(UUID userId, String encodedPassword) {
+        var ent = repository.findById(userId).orElseThrow();
+        ent.setPassword(encodedPassword);
+        repository.save(ent);
+    }
+}

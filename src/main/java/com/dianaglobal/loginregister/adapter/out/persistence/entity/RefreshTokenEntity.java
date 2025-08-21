@@ -22,5 +22,6 @@ public class RefreshTokenEntity {
     private String token;
     private Date expiryDate;
 
+    @Builder.Default
     private boolean revoked = false;
 }

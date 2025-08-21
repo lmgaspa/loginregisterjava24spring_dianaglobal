@@ -1,7 +1,7 @@
 package com.dianaglobal.loginregister.application.service;
 
+import com.dianaglobal.loginregister.adapter.out.persistence.BlacklistedTokenRepository;
 import com.dianaglobal.loginregister.domain.model.BlacklistedToken;
-import com.dianaglobal.loginregister.application.port.out.BlacklistedTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

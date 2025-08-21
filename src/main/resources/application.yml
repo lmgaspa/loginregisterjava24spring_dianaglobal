@@ -1,9 +1,27 @@
 spring:
+  application:
+    name: ${APPLICATION_NAME}
+
   data:
     mongodb:
-      uri: mongodb+srv://luizgabi:${MONGODB_PASSWORD}@apiluiz.ihmeusb.mongodb.net/login-register?retryWrites=true&w=majority&appName=APILuiz
+      uri: ${MONGODB_URI}
+
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 application:
-  name: login-register-app
   jwt:
     secret: ${JWT_SECRET}
+  brand:
+    name: ${BRAND_NAME}
+  frontend:
+    base-url: ${FRONTEND_BASE_URL}
