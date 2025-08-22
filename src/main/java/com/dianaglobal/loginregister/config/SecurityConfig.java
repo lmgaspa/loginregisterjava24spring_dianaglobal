@@ -29,32 +29,38 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults()) // <<< habilita CORS no security
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        // preflight precisa ser público
+                        // preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // suas rotas públicas
-                        .requestMatchers("/", "/api/auth/**",
-                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
-                        .permitAll()
+                        // swagger + springdoc
+                        .requestMatchers(
+                                "/",
+                                "/api/auth/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger",
+                                "/api-docs",
+                                "/api-docs/**"
+                        ).permitAll()
 
-                        // demais rotas autenticadas
+                        // demais rotas precisam de auth
                         .anyRequest().authenticated()
                 )
-                // seu filtro JWT deve vir antes do UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // CORS aplicado ao Security (origens do seu front)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOriginPatterns(List.of(
                 "https://www.dianaglobal.com.br",
-                "https://dianaglobal.com.br"
+                "https://dianaglobal.com.br",
+                "http://localhost:3000" // para testes
         ));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
