@@ -16,7 +16,7 @@ import java.util.Properties;
 @Service
 public class PasswordResetEmailService {
 
-    // ====== Lendo dos envs conforme seu application.yml ======
+    // ---- SMTP dos envs (application.yml) ----
     @Value("${mail.host}") private String host;
     @Value("${mail.port}") private int port;
     @Value("${mail.username}") private String username;
@@ -24,8 +24,9 @@ public class PasswordResetEmailService {
     @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
     @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
 
-    // Nome/brand – usa application.name se existir; fallback para "Diana Global"
-    @Value("${application.name:Diana Global}") private String brandName;
+    // ---- Constantes fixas de branding ----
+    private static final String APP_NAME = "Diana Global";
+    private static final String EMAIL_TITLE = "Diana Global – Recuperação de Senha";
 
     private JavaMailSender mailSender;
 
@@ -41,8 +42,7 @@ public class PasswordResetEmailService {
         Properties props = impl.getJavaMailProperties();
         props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
         props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        // Opcional: debug
-        // props.put("mail.debug", "true");
+        // props.put("mail.debug", "true"); // opcional
 
         this.mailSender = impl;
         log.info("PasswordResetEmailService initialized with host={} port={}", host, port);
@@ -57,16 +57,20 @@ public class PasswordResetEmailService {
      */
     public void sendPasswordReset(String to, String name, String link, int minutes) {
         try {
-            String subject = brandName + " – Recuperação de Senha";
+            String subject = EMAIL_TITLE;
             String html = buildHtml(name, link, minutes);
 
-            MimeMessage message = ((JavaMailSenderImpl) mailSender).createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, StandardCharsets.UTF_8.name());
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(
+                    message,
+                    MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+                    StandardCharsets.UTF_8.name()
+            );
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
-            // Remetente opcional: se seu provedor exigir um "from" específico:
-            // helper.setFrom(username, brandName);
+            // Se seu provedor exigir from explícito:
+            // helper.setFrom(username, APP_NAME);
 
             mailSender.send(message);
         } catch (Exception e) {
@@ -75,7 +79,7 @@ public class PasswordResetEmailService {
         }
     }
 
-    // ====== HTML embutido (estilo limpo, similar ao do seu recibo) ======
+    // ---- HTML do e‑mail (fixo para Diana Global) ----
     private String buildHtml(String name, String link, int minutes) {
         String safeName = (name == null || name.isBlank()) ? "cliente" : name;
         return """
@@ -84,7 +88,7 @@ public class PasswordResetEmailService {
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
-              <title>%s – Recuperação de Senha</title>
+              <title>%s</title>
               <style>
                 body{background:#f3f4f6;margin:0;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#111827;}
                 .card{max-width:640px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);}
@@ -107,7 +111,7 @@ public class PasswordResetEmailService {
             </head>
             <body>
               <div class="card">
-                <div class="header">%s – Recuperação de Senha</div>
+                <div class="header">%s</div>
                 <div class="content">
                   <p class="greet">Olá, %s!</p>
                   <p class="p">Recebemos uma solicitação para redefinir a sua senha.</p>
@@ -124,12 +128,22 @@ public class PasswordResetEmailService {
               </div>
             </body>
             </html>
-            """.formatted(brandName, brandName, escapeHtml(safeName), minutes, link, link, brandName);
+            """.formatted(
+                EMAIL_TITLE,          // <title>
+                EMAIL_TITLE,          // header
+                escapeHtml(safeName), // saudação
+                minutes,
+                link,
+                link,
+                APP_NAME              // footer
+        );
     }
 
-    // Bem simples; suficiente para nome. O link não passa por aqui.
     private static String escapeHtml(String s) {
-        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-                .replace("\"","&quot;").replace("'","&#x27;");
+        return s.replace("&","&amp;")
+                .replace("<","&lt;")
+                .replace(">","&gt;")
+                .replace("\"","&quot;")
+                .replace("'","&#x27;");
     }
 }
