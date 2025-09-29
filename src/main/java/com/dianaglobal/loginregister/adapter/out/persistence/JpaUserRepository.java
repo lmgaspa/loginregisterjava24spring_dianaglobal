@@ -40,8 +40,11 @@ public class JpaUserRepository implements UserRepositoryPort {
 
     @Override
     public void markEmailConfirmed(UUID userId) {
-        var ent = repository.findById(userId).orElseThrow();
-        ent.setEmailConfirmed(true);
-        repository.save(ent);
+        var ent = repository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        if (!ent.isEmailConfirmed()) {
+            ent.setEmailConfirmed(true);
+            repository.save(ent);
+        }
     }
 }

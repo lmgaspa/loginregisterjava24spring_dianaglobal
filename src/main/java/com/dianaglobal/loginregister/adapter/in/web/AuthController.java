@@ -167,6 +167,26 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));
     }
 
+    @PostMapping(value = "/confirm-account", produces = "application/json")
+    public ResponseEntity<MessageResponse> confirmAccount(
+            @RequestParam("token") String token) {
+        try {
+            accountConfirmationService.confirm(token);
+            return ResponseEntity.ok(new MessageResponse("E-mail confirmed successfully"));
+        } catch (IllegalArgumentException ex) {
+            // token inválido, expirado ou já usado
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new MessageResponse(ex.getMessage() == null
+                            ? "Invalid or expired confirmation link"
+                            : ex.getMessage()));
+        } catch (Exception ex) {
+            String id = java.util.UUID.randomUUID().toString();
+            log.error("[CONFIRM ERROR {}] {}", id, ex.getMessage(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Internal error. Code: " + id));
+        }
+    }
+
     /** Reenvia link de confirmação SEM vazar existência de e-mail e SEM 500. */
     @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> resendConfirmation(@Valid @RequestBody ForgotPasswordRequest req) {

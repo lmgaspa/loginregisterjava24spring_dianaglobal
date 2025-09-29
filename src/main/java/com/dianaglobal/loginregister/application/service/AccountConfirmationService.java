@@ -73,12 +73,14 @@ public class AccountConfirmationService {
 
         String tokenHash = sha256Url(raw);
 
-        var entity = tokenRepo.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, new Date())
+        AccountConfirmationTokenEntity entity = tokenRepo
+                .findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, new Date())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired token"));
 
-        // Marca o e-mail como confirmado via porta (OCP)
+        // marca usuário como confirmado
         userRepo.markEmailConfirmed(entity.getUserId());
 
+        // evita reuso
         entity.setUsedAt(new Date());
         tokenRepo.save(entity);
     }
