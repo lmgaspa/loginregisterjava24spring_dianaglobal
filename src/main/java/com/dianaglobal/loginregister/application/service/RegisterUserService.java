@@ -44,10 +44,10 @@ public class RegisterUserService implements RegisterUserUseCase {
         }
         boolean hasUpper = pwd.chars().anyMatch(Character::isUpperCase);
         boolean hasLower = pwd.chars().anyMatch(Character::isLowerCase);
-        long digits = pwd.chars().filter(Character::isDigit).count();
+        boolean hasDigit = pwd.chars().anyMatch(Character::isDigit);
 
-        if (!hasUpper) throw new IllegalArgumentException("Password must contain at least 1 uppercase letter");
-        if (!hasLower) throw new IllegalArgumentException("Password must contain at least 1 lowercase letter");
-        if (digits < 6) throw new IllegalArgumentException("Password must contain at least 6 digits");
+        if (!hasUpper) throw new IllegalArgumentException("Password must include at least 1 uppercase letter");
+        if (!hasLower) throw new IllegalArgumentException("Password must include at least 1 lowercase letter");
+        if (!hasDigit) throw new IllegalArgumentException("Password must include at least 1 digit");
     }
 }

@@ -1,3 +1,4 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/out/mail/PasswordResetEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
 import jakarta.annotation.PostConstruct;
@@ -16,7 +17,7 @@ import java.util.Properties;
 @Service
 public class PasswordResetEmailService {
 
-    // ---- SMTP dos envs (application.yml) ----
+    // ---- SMTP from env/application.yml ----
     @Value("${mail.host}") private String host;
     @Value("${mail.port}") private int port;
     @Value("${mail.username}") private String username;
@@ -24,9 +25,9 @@ public class PasswordResetEmailService {
     @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
     @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
 
-    // ---- Constantes fixas de branding ----
+    // ---- Branding constants ----
     private static final String APP_NAME = "Diana Global";
-    private static final String EMAIL_TITLE = "Diana Global – Recuperação de Senha";
+    private static final String EMAIL_TITLE = "Diana Global – Password Reset";
 
     private JavaMailSender mailSender;
 
@@ -42,18 +43,18 @@ public class PasswordResetEmailService {
         Properties props = impl.getJavaMailProperties();
         props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
         props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        // props.put("mail.debug", "true"); // opcional
+        // props.put("mail.debug", "true"); // optional
 
         this.mailSender = impl;
         log.info("PasswordResetEmailService initialized with host={} port={}", host, port);
     }
 
     /**
-     * Envia o e‑mail de recuperação com o link e expiração.
-     * @param to e‑mail do usuário
-     * @param name nome do usuário (pode ser null)
-     * @param link URL completa para redefinição (https://.../reset-password?token=...)
-     * @param minutes validade do link em minutos (ex.: 45)
+     * Sends the password reset e-mail with the link and expiration.
+     * @param to user's e-mail
+     * @param name user's name (may be null)
+     * @param link full reset URL (e.g. https://.../reset-password?token=...)
+     * @param minutes link validity in minutes (e.g. 45)
      */
     public void sendPasswordReset(String to, String name, String link, int minutes) {
         try {
@@ -69,22 +70,22 @@ public class PasswordResetEmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
-            // Se seu provedor exigir from explícito:
+            // If your provider requires an explicit From:
             // helper.setFrom(username, APP_NAME);
 
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("Erro ao enviar e‑mail de recuperação para {}: {}", to, e.getMessage(), e);
-            throw new RuntimeException("Falha ao enviar e‑mail de recuperação", e);
+            log.error("Error sending password reset e-mail to {}: {}", to, e.getMessage(), e);
+            throw new RuntimeException("Failed to send password reset e-mail", e);
         }
     }
 
-    // ---- HTML do e‑mail (fixo para Diana Global) ----
+    // ---- E-mail HTML (fixed content for Diana Global) ----
     private String buildHtml(String name, String link, int minutes) {
-        String safeName = (name == null || name.isBlank()) ? "cliente" : name;
+        String safeName = (name == null || name.isBlank()) ? "customer" : name;
         return """
             <!doctype html>
-            <html lang="pt-BR">
+            <html lang="en">
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
@@ -113,17 +114,17 @@ public class PasswordResetEmailService {
               <div class="card">
                 <div class="header">%s</div>
                 <div class="content">
-                  <p class="greet">Olá, %s!</p>
-                  <p class="p">Recebemos uma solicitação para redefinir a sua senha.</p>
-                  <p class="p">Para continuar, clique no botão abaixo. O link expira em <strong>%d minutos</strong>.</p>
+                  <p class="greet">Hello, %s!</p>
+                  <p class="p">We received a request to reset your password.</p>
+                  <p class="p">To continue, click the button below. The link expires in <strong>%d minutes</strong>.</p>
                   <p style="margin:20px 0">
-                    <a class="btn" href="%s" target="_blank" rel="noopener noreferrer">Redefinir minha senha</a>
+                    <a class="btn" href="%s" target="_blank" rel="noopener noreferrer">Reset my password</a>
                   </p>
-                  <p class="p">Se você não solicitou essa alteração, ignore este e‑mail com segurança.</p>
-                  <p class="muted">Se o botão não funcionar, copie e cole este link no navegador:<br>%s</p>
+                  <p class="p">If you did not request this change, you can safely ignore this e-mail.</p>
+                  <p class="muted">If the button does not work, copy and paste this link into your browser:<br>%s</p>
                 </div>
                 <div class="footer">
-                  © 2025 %s. Todos os direitos reservados.
+                  © 2025 %s. All rights reserved.
                 </div>
               </div>
             </body>
@@ -131,7 +132,7 @@ public class PasswordResetEmailService {
             """.formatted(
                 EMAIL_TITLE,          // <title>
                 EMAIL_TITLE,          // header
-                escapeHtml(safeName), // saudação
+                escapeHtml(safeName), // greeting
                 minutes,
                 link,
                 link,
