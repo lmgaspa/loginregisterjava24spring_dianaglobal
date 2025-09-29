@@ -12,15 +12,17 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -36,38 +38,56 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody @Valid RegisterRequest request) {
-        registerService.register(request.name(), request.email(), request.password());
-        return ResponseEntity.ok("User successfully registered");
+    public ResponseEntity<MessageResponse> register(@RequestBody @Valid RegisterRequest request) {
+        // Normalize inputs early
+        final String name = request.name().trim();
+        final String email = request.email().trim().toLowerCase();
+        final String password = request.password();
+
+        registerService.register(name, email, password);
+
+        // 201 + Location (points to a simple lookup)
+        URI location = URI.create("/api/auth/find-user?email=" + email);
+        return ResponseEntity.created(location)
+                .headers(h -> h.add(HttpHeaders.LOCATION, location.toString()))
+                .body(new MessageResponse("User successfully registered"));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
-        var user = userRepositoryPort.findByEmail(request.email())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
+    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest request) {
+        var userOpt = userRepositoryPort.findByEmail(request.email().trim().toLowerCase());
+        if (userOpt.isEmpty()) {
+            // do not leak which part failed
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid credentials"));
+        }
+        var user = userOpt.get();
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid credentials"));
         }
 
         String jwt = jwtService.generateToken(user.getEmail());
         String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
-
         return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<ProfileResponseDTO> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<?> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Not authenticated"));
+        }
         User user = userRepositoryPort.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
         return ResponseEntity.ok(new ProfileResponseDTO(user.getId(), user.getName(), user.getEmail()));
     }
 
     @PostMapping("/refresh-token")
-    public ResponseEntity<JwtResponse> refresh(@RequestBody @Valid RefreshRequestDTO body) {
+    public ResponseEntity<?> refresh(@RequestBody @Valid RefreshRequestDTO body) {
         if (!refreshTokenService.validate(body.refreshToken())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid or expired refresh token"));
         }
         String email = refreshTokenService.getEmailByToken(body.refreshToken());
         String newToken = jwtService.generateToken(email);
@@ -75,27 +95,33 @@ public class AuthController {
     }
 
     @GetMapping("/find-user")
-    public ResponseEntity<String> findUser(
+    public ResponseEntity<?> findUser(
             @RequestParam
             @Email(message = "Invalid e-mail")
             @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
                     message = "E-mail must contain a valid domain/TLD")
             String email) {
-        return userService.findByEmail(email.trim().toLowerCase())
-                .map(u -> ResponseEntity.ok("User found: " + u.getEmail()))
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
+
+        String normalized = email.trim().toLowerCase();
+        return userService.findByEmail(normalized)
+                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new MessageResponse("User found: " + u.getEmail())))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new MessageResponse("User not found")));
     }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(@RequestBody @Valid RefreshRequestDTO body) {
+    public ResponseEntity<MessageResponse> logout(@RequestBody @Valid RefreshRequestDTO body) {
         refreshTokenService.revokeToken(body.refreshToken());
-        return ResponseEntity.ok("Logged out successfully");
+        return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
     }
 
     @PostMapping("/revoke-refresh")
-    public ResponseEntity<String> revokeRefresh(@RequestBody @Valid RefreshRequestDTO body) {
+    public ResponseEntity<MessageResponse> revokeRefresh(@RequestBody @Valid RefreshRequestDTO body) {
         refreshTokenService.revokeToken(body.refreshToken());
-        return ResponseEntity.ok("Refresh token revoked.");
+        return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));
     }
+
+    // Small, reusable message DTO
+    public record MessageResponse(String message) {}
 }
