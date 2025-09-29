@@ -1,20 +1,22 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/in/web/AuthController.java
 package com.dianaglobal.loginregister.adapter.in.web;
 
-import com.dianaglobal.loginregister.adapter.in.dto.*;
+import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.ProfileResponseDTO;
+import com.dianaglobal.loginregister.adapter.in.dto.RefreshRequestDTO;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.password.RegisterRequest;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
-import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
-import com.dianaglobal.loginregister.application.service.JwtService;
-import com.dianaglobal.loginregister.application.service.RefreshTokenService;
-import com.dianaglobal.loginregister.application.service.UserService;
+import com.dianaglobal.loginregister.application.service.*;
 import com.dianaglobal.loginregister.domain.model.User;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
@@ -28,7 +30,9 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -46,6 +50,11 @@ public class AuthController {
     @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
 
+    // ---------------------------------------
+    // DTO simples pra mensagens
+    public record MessageResponse(String message) {}
+    // ---------------------------------------
+
     @PostMapping(value = "/register", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> register(@RequestBody @Valid RegisterRequest request) {
         final String name = request.name().trim();
@@ -60,7 +69,7 @@ public class AuthController {
             try {
                 accountConfirmationService.requestConfirmation(email, frontendBaseUrl);
             } catch (Exception mailEx) {
-                System.err.println("[REGISTER WARN] failed to send confirmation e-mail: " + mailEx.getMessage());
+                log.warn("[REGISTER WARN] failed to send confirmation e-mail: {}", mailEx.getMessage());
             }
 
             URI location = URI.create("/api/auth/find-user?email=" + email);
@@ -73,9 +82,8 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new MessageResponse("E-mail is already registered"));
         } catch (Exception e) {
-            String id = java.util.UUID.randomUUID().toString();
-            System.err.println("[REGISTER ERROR " + id + "] " + e.getMessage());
-            e.printStackTrace();
+            String id = UUID.randomUUID().toString();
+            log.error("[REGISTER ERROR {}] {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new MessageResponse("Internal error. Code: " + id));
         }
@@ -134,7 +142,8 @@ public class AuthController {
     public ResponseEntity<?> findUser(
             @RequestParam
             @Email(message = "Invalid e-mail")
-            @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+            @Pattern(
+                    regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
                     message = "E-mail must contain a valid domain")
             String email) {
 
@@ -158,5 +167,16 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));
     }
 
-    public record MessageResponse(String message) {}
+    /** Reenvia link de confirmação SEM vazar existência de e-mail e SEM 500. */
+    @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<MessageResponse> resendConfirmation(@Valid @RequestBody ForgotPasswordRequest req) {
+        try {
+            accountConfirmationService.requestConfirmation(req.email(), frontendBaseUrl);
+        } catch (Exception e) {
+            log.warn("[CONFIRM RESEND WARN] {}", e.getMessage());
+        }
+        return ResponseEntity.ok(new MessageResponse(
+                "If an account exists for this e-mail, we have sent a new confirmation link."
+        ));
+    }
 }

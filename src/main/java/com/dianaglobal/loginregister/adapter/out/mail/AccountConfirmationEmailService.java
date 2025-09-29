@@ -8,16 +8,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 @Slf4j
-@Service
+@Component
 public class AccountConfirmationEmailService {
 
-    // ---- SMTP from env/application.yml (mesmo que PasswordResetEmailService) ----
     @Value("${mail.host}") private String host;
     @Value("${mail.port}") private int port;
     @Value("${mail.username}") private String username;
@@ -25,7 +24,6 @@ public class AccountConfirmationEmailService {
     @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
     @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
 
-    // Branding
     @Value("${application.brand.name:Diana Global}")
     private String brandName;
 
@@ -43,23 +41,16 @@ public class AccountConfirmationEmailService {
         Properties props = impl.getJavaMailProperties();
         props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
         props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        // props.put("mail.debug", "true");
-
         this.mailSender = impl;
+
         log.info("AccountConfirmationEmailService initialized with host={} port={}", host, port);
     }
 
-    /**
-     * Sends the account confirmation e-mail with the link and expiration.
-     * @param to recipient e-mail
-     * @param name recipient name (nullable)
-     * @param link confirmation URL
-     * @param minutes link validity in minutes (e.g. 45)
-     */
-    public void send(String to, String name, String link, int minutes) {
+    /** minutes deve ser INT. */
+    public void send(String toEmail, String toName, String link, int minutes) {
         try {
             String subject = brandName + " – Confirm your account";
-            String html = buildHtml(name, link, minutes);
+            String html = buildHtml(toName, link, minutes);
 
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
@@ -67,23 +58,22 @@ public class AccountConfirmationEmailService {
                     MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
                     StandardCharsets.UTF_8.name()
             );
-            helper.setTo(to);
+            helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
-            // helper.setFrom(username, brandName); // se seu provedor exigir
+            // helper.setFrom(username, brandName); // se o provedor exigir
 
             mailSender.send(message);
-            log.info("Sent account confirmation email to {}", to);
+            log.info("Account confirmation e-mail sent to {}", toEmail);
         } catch (Exception e) {
-            log.error("Error sending account confirmation e-mail to {}: {}", to, e.getMessage(), e);
+            log.error("Error sending account confirmation e-mail to {}: {}", toEmail, e.getMessage(), e);
             throw new RuntimeException("Failed to send account confirmation e-mail", e);
         }
     }
 
-    // ---- HTML (placeholders corretos) ----
     private String buildHtml(String name, String link, int minutes) {
-        String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         String title = brandName + " – Confirm your account";
+        String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
 
         return """
             <!doctype html>
@@ -116,30 +106,28 @@ public class AccountConfirmationEmailService {
               <div class="card">
                 <div class="header">%s</div>
                 <div class="content">
-                  <p class="greet">Hi %s,</p>
-                  <p class="p">Welcome to %s!</p>
-                  <p class="p">Please confirm your account by clicking the button below. The link expires in <strong>%d minutes</strong>.</p>
+                  <p class="greet">Hello, %s!</p>
+                  <p class="p">Thanks for signing up. Please confirm your account:</p>
                   <p style="margin:20px 0">
                     <a class="btn" href="%s" target="_blank" rel="noopener noreferrer">Confirm my account</a>
                   </p>
-                  <p class="p">If you didn’t create an account, you can safely ignore this e-mail.</p>
-                  <p class="muted">If the button does not work, copy and paste this link into your browser:<br>%s</p>
+                  <p class="p">For your security, this link expires in <strong>%d minutes</strong> and can be used only once.</p>
+                  <p class="muted">If the button doesn’t work, copy and paste this link into your browser:<br>%s</p>
                 </div>
                 <div class="footer">
-                  © %s. All rights reserved.
+                  © 2025 %s. All rights reserved.
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
-                title,          // <title>
-                title,          // header
-                safeName,       // greeting name
-                escapeHtml(brandName), // welcome line
-                minutes,        // %d minutes (int)
-                link,           // button href
-                link,           // plain link
-                escapeHtml(brandName)  // footer
+                title,
+                title,
+                safeName,
+                link,
+                minutes,   // <- INT aqui
+                link,
+                brandName
         );
     }
 
