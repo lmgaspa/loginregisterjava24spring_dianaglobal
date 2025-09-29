@@ -66,7 +66,13 @@ public class PasswordResetService {
     public void resetPassword(String tokenPlain, String newPassword) {
         validatePasswordStrength(newPassword);
 
-        byte[] raw = Base64.getUrlDecoder().decode(tokenPlain);
+        final byte[] raw;
+        try {
+            raw = Base64.getUrlDecoder().decode(tokenPlain);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid or expired token");
+        }
+
         String tokenHash = sha256Url(raw);
 
         var entity = tokenRepo.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, new Date())
@@ -81,7 +87,7 @@ public class PasswordResetService {
 
     // --- helpers ---
 
-    // ≥8 chars, ≥1 uppercase, ≥1 lowercase, ≥6 digits
+    // ≥8 chars, ≥1 uppercase, ≥1 lowercase, ≥1 digit
     private static void validatePasswordStrength(String pwd) {
         if (pwd == null || pwd.length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");
@@ -92,7 +98,7 @@ public class PasswordResetService {
 
         if (!hasUpper) throw new IllegalArgumentException("Password must contain at least 1 uppercase letter");
         if (!hasLower) throw new IllegalArgumentException("Password must contain at least 1 lowercase letter");
-        if (digits < 6) throw new IllegalArgumentException("Password must contain at least 6 digits");
+        if (digits < 1) throw new IllegalArgumentException("Password must contain at least 1 digit");
     }
 
     private static String sha256Url(byte[] data) {

@@ -113,7 +113,7 @@ public class AuthController {
             @RequestParam
             @Email(message = "Invalid e-mail")
             @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
-                    message = "E-mail must contain a valid domain/TLD")
+                    message = "E-mail must contain a valid domain")
             String email) {
 
         String normalized = email.trim().toLowerCase();
