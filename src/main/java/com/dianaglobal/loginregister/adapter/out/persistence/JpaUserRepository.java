@@ -1,5 +1,7 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/out/persistence/JpaUserRepository.java
 package com.dianaglobal.loginregister.adapter.out.persistence;
 
+import com.dianaglobal.loginregister.adapter.out.persistence.entity.SpringUserRepository;
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.UserEntity;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
