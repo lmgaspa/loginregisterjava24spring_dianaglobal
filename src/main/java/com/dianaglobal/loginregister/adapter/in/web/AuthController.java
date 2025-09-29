@@ -111,8 +111,10 @@ public class AuthController {
         String jwt = jwtService.generateToken(user.getEmail());
         String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
 
+        // AQUI:
         return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
     }
+
 
     @GetMapping(value = "/profile", produces = "application/json")
     public ResponseEntity<?> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
