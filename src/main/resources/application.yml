@@ -6,6 +6,7 @@ spring:
     mongodb:
       uri: ${MONGODB_URI}
       auto-index-creation: true
+      uuid-representation: standard
 
   mail:
     host: ${MAIL_HOST}
