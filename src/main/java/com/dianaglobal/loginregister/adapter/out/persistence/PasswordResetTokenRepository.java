@@ -1,3 +1,4 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/out/persistence/PasswordResetTokenRepository.java
 package com.dianaglobal.loginregister.adapter.out.persistence;
 
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.PasswordResetTokenEntity;
@@ -9,5 +10,5 @@ import java.util.UUID;
 
 public interface PasswordResetTokenRepository extends MongoRepository<PasswordResetTokenEntity, UUID> {
     Optional<PasswordResetTokenEntity> findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(String tokenHash, Date now);
-    void deleteByUserId(UUID userId); // para revogar anteriores, se preferir deletar
+    void deleteByUserId(UUID userId);
 }

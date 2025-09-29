@@ -27,7 +27,6 @@ public class UserEntity {
     private String name;
 
     public User toDomain() {
-        // keep the persisted ID, never generate a new one here
         return new User(this.id, this.name, this.email, this.password);
     }
 

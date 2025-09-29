@@ -5,6 +5,7 @@ import com.dianaglobal.loginregister.adapter.out.mail.PasswordResetEmailService;
 import com.dianaglobal.loginregister.adapter.out.persistence.PasswordResetTokenRepository;
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.PasswordResetTokenEntity;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
+import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,18 +28,18 @@ public class PasswordResetService {
     private final PasswordResetEmailService emailService;
     private final PasswordEncoder passwordEncoder;
 
-    /** Issues a reset link by creating a random token, storing only its SHA-256 hash, and e-mailing the link. */
+    /** Create a reset link: random token, store only SHA-256 hash, send e-mail. */
     public void requestReset(String email, String frontendBaseUrl) {
-        Optional<com.dianaglobal.loginregister.domain.model.User> opt =
-                userRepo.findByEmail(email == null ? "" : email.trim().toLowerCase());
-        if (opt.isEmpty()) return; // do not leak existence
+        final String normalized = email == null ? "" : email.trim().toLowerCase();
+        Optional<User> opt = userRepo.findByEmail(normalized);
+        if (opt.isEmpty()) return; // do not leak user existence
 
-        var user = opt.get();
+        User user = opt.get();
 
-        // Enforce single active token per user
+        // Single active token per user
         tokenRepo.deleteByUserId(user.getId());
 
-        // 32 random bytes -> URL-safe token
+        // 32 random bytes -> URL-safe plaintext token for the link
         byte[] raw = new byte[32];
         new SecureRandom().nextBytes(raw);
         String tokenPlain = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
@@ -46,7 +47,7 @@ public class PasswordResetService {
 
         Instant expires = Instant.now().plusSeconds(45 * 60);
 
-        var entity = PasswordResetTokenEntity.builder()
+        PasswordResetTokenEntity entity = PasswordResetTokenEntity.builder()
                 .id(UUID.randomUUID())
                 .userId(user.getId())
                 .tokenHash(tokenHash)
@@ -60,7 +61,7 @@ public class PasswordResetService {
         emailService.sendPasswordReset(user.getEmail(), user.getName(), link, 45);
     }
 
-    /** Validates token and actually updates the password in Mongo (BCrypt). Token becomes single-use. */
+    /** Validate token and actually update the password (BCrypt). Token becomes single-use. */
     @Transactional
     public void resetPassword(String tokenPlain, String newPassword) {
         validatePasswordStrength(newPassword);
@@ -80,6 +81,7 @@ public class PasswordResetService {
 
     // --- helpers ---
 
+    // ≥8 chars, ≥1 uppercase, ≥1 lowercase, ≥6 digits
     private static void validatePasswordStrength(String pwd) {
         if (pwd == null || pwd.length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");
@@ -98,7 +100,7 @@ public class PasswordResetService {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to hash token", e);
         }
     }
 }

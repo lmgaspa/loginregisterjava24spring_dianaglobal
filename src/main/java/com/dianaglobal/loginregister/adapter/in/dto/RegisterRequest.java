@@ -1,4 +1,3 @@
-// src/main/java/com/dianaglobal/loginregister/adapter/in/dto/RegisterRequest.java
 package com.dianaglobal.loginregister.adapter.in.dto;
 
 import jakarta.validation.constraints.Email;
@@ -20,9 +19,8 @@ public record RegisterRequest(
         @NotBlank
         @Size(min = 8, message = "Password must be at least 8 characters long")
         @Pattern(
-                // >=1 uppercase, >=1 lowercase, >=6 digits, total length validated by @Size
                 regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=(?:.*\\d){6,}).{8,}$",
-                message = "Password must have at least 1 uppercase letter, 1 lowercase letter, and 6 digits"
+                message = "Password must include at least 1 uppercase letter, 1 lowercase letter, and 6 digits"
         )
         String password
 ) {}
