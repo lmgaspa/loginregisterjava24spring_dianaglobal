@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,18 +39,29 @@ public class AuthController {
 
     @PostMapping(value = "/register", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> register(@RequestBody @Valid RegisterRequest request) {
-        // Normalize inputs
         final String name = request.name().trim();
         final String email = request.email().trim().toLowerCase();
         final String password = request.password();
 
-        registerService.register(name, email, password);
-
-        // 201 + Location header pointing to a harmless finder
-        URI location = URI.create("/api/auth/find-user?email=" + email);
-        return ResponseEntity
-                .created(location)
-                .body(new MessageResponse("User successfully registered"));
+        try {
+            registerService.register(name, email, password);
+            URI location = URI.create("/api/auth/find-user?email=" + email);
+            return ResponseEntity.created(location)
+                    .header(HttpHeaders.LOCATION, location.toString())
+                    .body(new MessageResponse("User successfully registered"));
+        } catch (IllegalArgumentException e) {           // violação de regra de negócio
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (org.springframework.dao.DuplicateKeyException e) {   // se houver índice único
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new MessageResponse("E-mail is already registered"));
+        } catch (Exception e) {                          // qualquer outra falha
+            String id = java.util.UUID.randomUUID().toString();
+            // LOG completo no servidor para você achar pelo id:
+            System.err.println("[REGISTER ERROR " + id + "] " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Internal error. Code: " + id));
+        }
     }
 
     @PostMapping(value = "/login", consumes = "application/json", produces = "application/json")

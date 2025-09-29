@@ -5,6 +5,7 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI}
+      auto-index-creation: true
 
   mail:
     host: ${MAIL_HOST}
