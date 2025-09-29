@@ -1,6 +1,8 @@
 spring:
   application:
     name: ${APPLICATION_NAME}
+  brand:
+    name:${BRAND_NAME:Diana Global}
 
   data:
     mongodb:

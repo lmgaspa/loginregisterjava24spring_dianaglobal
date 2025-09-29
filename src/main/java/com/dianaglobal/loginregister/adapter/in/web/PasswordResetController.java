@@ -1,8 +1,8 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/in/web/PasswordResetController.java
 package com.dianaglobal.loginregister.adapter.in.web;
 
-import com.dianaglobal.loginregister.adapter.in.dto.ForgotPasswordRequest;
-import com.dianaglobal.loginregister.adapter.in.dto.ResetPasswordRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.password.ResetPasswordRequest;
 import com.dianaglobal.loginregister.application.service.PasswordResetService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -3,6 +3,7 @@ package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
+import com.dianaglobal.loginregister.application.service.exception.EmailAlreadyUsedException;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,7 +20,7 @@ public class RegisterUserService implements RegisterUserUseCase {
 
     @Override
     public void register(String name, String email, String password) {
-        validatePasswordStrength(password); // <— strong rule
+        validatePasswordStrength(password);
 
         final String normalizedEmail = email == null ? null : email.trim().toLowerCase();
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
@@ -29,15 +30,17 @@ public class RegisterUserService implements RegisterUserUseCase {
             throw new RuntimeException("Email already in use");
         }
 
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setName(name == null ? null : name.trim());
-        user.setEmail(normalizedEmail);
-        user.setPassword(encoder.encode(password));
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name(name == null ? null : name.trim())
+                .email(normalizedEmail)
+                .password(encoder.encode(password))
+                .emailConfirmed(false)
+                .build();
+
         userRepository.save(user);
     }
 
-    // --- helpers ---
     private static void validatePasswordStrength(String pwd) {
         if (pwd == null || pwd.length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");

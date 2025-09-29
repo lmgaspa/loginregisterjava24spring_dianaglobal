@@ -9,33 +9,44 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.UUID;
 
-@Document(collection = "users")
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Document(collection = "users")
 public class UserEntity {
-
     @Id
     private UUID id;
+
+    private String name;
 
     @Indexed(unique = true)
     private String email;
 
     private String password;
-    private String name;
 
-    public User toDomain() {
-        return new User(this.id, this.name, this.email, this.password);
+    @Builder.Default
+    private boolean emailConfirmed = false;
+
+    public static UserEntity fromDomain(User d) {
+        if (d == null) return null;
+        return UserEntity.builder()
+                .id(d.getId())
+                .name(d.getName())
+                .email(d.getEmail())
+                .password(d.getPassword())
+                .emailConfirmed(d.isEmailConfirmed())
+                .build();
     }
 
-    public static UserEntity fromDomain(User user) {
-        return UserEntity.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .password(user.getPassword())
-                .name(user.getName())
+    public static User toDomain(UserEntity e) {
+        if (e == null) return null;
+        return User.builder()
+                .id(e.getId())
+                .name(e.getName())
+                .email(e.getEmail())
+                .password(e.getPassword())
+                .emailConfirmed(e.isEmailConfirmed())
                 .build();
     }
 }

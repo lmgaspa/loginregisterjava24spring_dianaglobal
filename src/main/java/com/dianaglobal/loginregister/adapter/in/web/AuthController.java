@@ -2,16 +2,23 @@
 package com.dianaglobal.loginregister.adapter.in.web;
 
 import com.dianaglobal.loginregister.adapter.in.dto.*;
+import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.password.RegisterRequest;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.application.service.JwtService;
 import com.dianaglobal.loginregister.application.service.RefreshTokenService;
 import com.dianaglobal.loginregister.application.service.UserService;
+import com.dianaglobal.loginregister.application.service.exception.EmailAlreadyUsedException;
 import com.dianaglobal.loginregister.domain.model.User;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -49,14 +57,16 @@ public class AuthController {
             return ResponseEntity.created(location)
                     .header(HttpHeaders.LOCATION, location.toString())
                     .body(new MessageResponse("User successfully registered"));
-        } catch (IllegalArgumentException e) {           // violação de regra de negócio
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
-        } catch (org.springframework.dao.DuplicateKeyException e) {   // se houver índice único
+        } catch (EmailAlreadyUsedException | DuplicateKeyException e) { // 409 specific
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new MessageResponse("E-mail is already registered"));
-        } catch (Exception e) {                          // qualquer outra falha
+        } catch (DataIntegrityViolationException e) { // 409 generic
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new MessageResponse("E-mail is already registered"));
+        } catch (Exception e) {
             String id = java.util.UUID.randomUUID().toString();
-            // LOG completo no servidor para você achar pelo id:
             System.err.println("[REGISTER ERROR " + id + "] " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -90,10 +100,8 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Not authenticated"));
         }
-
         User user = userRepositoryPort.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
         return ResponseEntity.ok(new ProfileResponseDTO(user.getId(), user.getName(), user.getEmail()));
     }
 
@@ -136,6 +144,5 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));
     }
 
-    // Small, reusable message DTO
     public record MessageResponse(String message) {}
 }

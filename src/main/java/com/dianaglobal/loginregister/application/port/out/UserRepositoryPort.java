@@ -8,7 +8,9 @@ import java.util.UUID;
 public interface UserRepositoryPort {
     void save(User user);
     void updatePassword(UUID userId, String encodedPassword);
+
     Optional<User> findById(UUID id);
     Optional<User> findByEmail(String email);
+    // NEW: marcar e-mail como confirmado
+    void markEmailConfirmed(UUID userId);
 }
-

@@ -1,4 +1,3 @@
-// src/main/java/com/dianaglobal/loginregister/adapter/out/persistence/JpaUserRepository.java
 package com.dianaglobal.loginregister.adapter.out.persistence;
 
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.SpringUserRepository;
@@ -36,6 +35,13 @@ public class JpaUserRepository implements UserRepositoryPort {
     public void updatePassword(UUID userId, String encodedPassword) {
         var ent = repository.findById(userId).orElseThrow();
         ent.setPassword(encodedPassword);
+        repository.save(ent);
+    }
+
+    @Override
+    public void markEmailConfirmed(UUID userId) {
+        var ent = repository.findById(userId).orElseThrow();
+        ent.setEmailConfirmed(true);
         repository.save(ent);
     }
 }

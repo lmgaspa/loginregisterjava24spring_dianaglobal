@@ -8,13 +8,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Date;
 import java.util.UUID;
 
-// password_reset_tokens
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Document(collection = "password_reset_tokens")
-public class PasswordResetTokenEntity {
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor @Builder
+@Document(collection = "account_confirmation_tokens")
+public class AccountConfirmationTokenEntity {
 
     @Id
     private UUID id;
@@ -22,16 +19,16 @@ public class PasswordResetTokenEntity {
     @Indexed
     private UUID userId;
 
-    /** SHA-256 (URL-safe) do token em texto puro */
+    /** Armazene apenas o hash; torne-o único para evitar colisões acidentais */
     @Indexed(unique = true)
     private String tokenHash;
 
-    /** Expira exatamente neste horário */
-    @Indexed(name = "password_reset_expires_ttl", expireAfter = "PT0S")
+    @Builder.Default
+    private Date createdAt = new Date();
+
+    /** TTL do Mongo: expira exatamente neste horário */
+    @Indexed(name = "account_confirm_expires_ttl", expireAfter = "PT0S")
     private Date expiresAt;
 
     private Date usedAt;
-
-    @Builder.Default
-    private Date createdAt = new Date();
 }
