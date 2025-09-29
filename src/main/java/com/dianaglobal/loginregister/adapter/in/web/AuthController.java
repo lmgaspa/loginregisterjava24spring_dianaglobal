@@ -12,7 +12,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,31 +36,31 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
-    @PostMapping("/register")
+    @PostMapping(value = "/register", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> register(@RequestBody @Valid RegisterRequest request) {
-        // Normalize inputs early
+        // Normalize inputs
         final String name = request.name().trim();
         final String email = request.email().trim().toLowerCase();
         final String password = request.password();
 
         registerService.register(name, email, password);
 
-        // 201 + Location (points to a simple lookup)
+        // 201 + Location header pointing to a harmless finder
         URI location = URI.create("/api/auth/find-user?email=" + email);
-        return ResponseEntity.created(location)
-                .headers(h -> h.add(HttpHeaders.LOCATION, location.toString()))
+        return ResponseEntity
+                .created(location)
                 .body(new MessageResponse("User successfully registered"));
     }
 
-    @PostMapping("/login")
+    @PostMapping(value = "/login", consumes = "application/json", produces = "application/json")
     public ResponseEntity<?> login(@RequestBody @Valid LoginRequest request) {
         var userOpt = userRepositoryPort.findByEmail(request.email().trim().toLowerCase());
         if (userOpt.isEmpty()) {
-            // do not leak which part failed
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Invalid credentials"));
         }
-        var user = userOpt.get();
+
+        User user = userOpt.get();
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Invalid credentials"));
@@ -69,21 +68,24 @@ public class AuthController {
 
         String jwt = jwtService.generateToken(user.getEmail());
         String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
+
         return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
     }
 
-    @GetMapping("/profile")
+    @GetMapping(value = "/profile", produces = "application/json")
     public ResponseEntity<?> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Not authenticated"));
         }
+
         User user = userRepositoryPort.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
         return ResponseEntity.ok(new ProfileResponseDTO(user.getId(), user.getName(), user.getEmail()));
     }
 
-    @PostMapping("/refresh-token")
+    @PostMapping(value = "/refresh-token", consumes = "application/json", produces = "application/json")
     public ResponseEntity<?> refresh(@RequestBody @Valid RefreshRequestDTO body) {
         if (!refreshTokenService.validate(body.refreshToken())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -94,7 +96,7 @@ public class AuthController {
         return ResponseEntity.ok(new JwtResponse(newToken));
     }
 
-    @GetMapping("/find-user")
+    @GetMapping(value = "/find-user", produces = "application/json")
     public ResponseEntity<?> findUser(
             @RequestParam
             @Email(message = "Invalid e-mail")
@@ -110,13 +112,13 @@ public class AuthController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @PostMapping("/logout")
+    @PostMapping(value = "/logout", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> logout(@RequestBody @Valid RefreshRequestDTO body) {
         refreshTokenService.revokeToken(body.refreshToken());
         return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
     }
 
-    @PostMapping("/revoke-refresh")
+    @PostMapping(value = "/revoke-refresh", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> revokeRefresh(@RequestBody @Valid RefreshRequestDTO body) {
         refreshTokenService.revokeToken(body.refreshToken());
         return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));

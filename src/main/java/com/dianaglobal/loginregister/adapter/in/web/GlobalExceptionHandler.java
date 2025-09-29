@@ -1,6 +1,7 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/in/web/GlobalExceptionHandler.java
 package com.dianaglobal.loginregister.adapter.in.web;
 
+import com.mongodb.MongoWriteException;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
@@ -77,9 +78,7 @@ public class GlobalExceptionHandler {
     }
 
     /* 401 - Auth issues */
-    @ExceptionHandler({
-            BadCredentialsException.class
-    })
+    @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Object> handleBadCredentials(Exception ex, HttpServletRequest req) {
         return build(HttpStatus.UNAUTHORIZED, "Invalid credentials", safeDetail(ex), req);
     }
@@ -105,14 +104,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "Resource not found", safeDetail(ex), req);
     }
 
-    /* 409 - Duplicate e-mail or integrity violations */
+    /* 409 - Duplicate e-mail or other integrity violations */
     @ExceptionHandler({DuplicateKeyException.class, DataIntegrityViolationException.class})
     public ResponseEntity<Object> handleConflict(Exception ex, HttpServletRequest req) {
-        // Most common case in your app is duplicate e-mail
         return build(HttpStatus.CONFLICT, "E-mail is already registered", safeDetail(ex), req);
     }
 
-    /* 400 - Simple business rule failures you throw with IllegalArgumentException */
+    /* 409 - Mongo duplicate key (code 11000) */
+    @ExceptionHandler(MongoWriteException.class)
+    public ResponseEntity<Object> handleMongoWrite(MongoWriteException ex, HttpServletRequest req) {
+        if (ex.getError() != null && ex.getError().getCode() == 11000) {
+            return build(HttpStatus.CONFLICT, "E-mail is already registered", safeDetail(ex), req);
+        }
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Database write error", safeDetail(ex), req);
+    }
+
+    /* 400 - Business rule failures thrown as IllegalArgumentException */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Object> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), safeDetail(ex), req);
@@ -121,7 +128,6 @@ public class GlobalExceptionHandler {
     /* 500 - Fallback */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGeneric(Exception ex, HttpServletRequest req) {
-        // Attach a simple correlation ID so you can find the stack trace in server logs.
         String errorId = UUID.randomUUID().toString();
         Map<String, Object> body = baseBody(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", req);
         body.put("detail", "Error ID: " + errorId);
