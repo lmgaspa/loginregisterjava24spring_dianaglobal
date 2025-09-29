@@ -1,11 +1,10 @@
-// src/main/java/com/dianaglobal/loginregister/application/service/RegisterUserService.java
 package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
-import com.dianaglobal.loginregister.application.service.exception.EmailAlreadyUsedException;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +25,10 @@ public class RegisterUserService implements RegisterUserUseCase {
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
             throw new IllegalArgumentException("E-mail is required.");
         }
+
+        // Se já existir, lançamos DuplicateKeyException -> 409 via GlobalExceptionHandler
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
-            throw new RuntimeException("Email already in use");
+            throw new DuplicateKeyException("E-mail is already registered");
         }
 
         User user = User.builder()
@@ -41,6 +42,7 @@ public class RegisterUserService implements RegisterUserUseCase {
         userRepository.save(user);
     }
 
+    // --- helpers ---
     private static void validatePasswordStrength(String pwd) {
         if (pwd == null || pwd.length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");

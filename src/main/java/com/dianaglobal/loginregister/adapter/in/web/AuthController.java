@@ -6,14 +6,17 @@ import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.password.RegisterRequest;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
-import com.dianaglobal.loginregister.application.service.*;
+import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
+import com.dianaglobal.loginregister.application.service.JwtService;
+import com.dianaglobal.loginregister.application.service.RefreshTokenService;
+import com.dianaglobal.loginregister.application.service.UserService;
 import com.dianaglobal.loginregister.domain.model.User;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,14 +36,14 @@ import java.net.URI;
 public class AuthController {
 
     private final RegisterUserUseCase registerService;
+    private final AccountConfirmationService accountConfirmationService;
     private final UserService userService;
     private final UserRepositoryPort userRepositoryPort;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
-    private final AccountConfirmationService accountConfirmationService;
 
-    @Value("${application.frontend.base-url}")
+    @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
 
     @PostMapping(value = "/register", consumes = "application/json", produces = "application/json")
@@ -50,18 +53,23 @@ public class AuthController {
         final String password = request.password();
 
         try {
+            // cria usuário (409 se já existir)
             registerService.register(name, email, password);
 
-            // Envia o e-mail de confirmação apenas no cadastro
-            accountConfirmationService.requestConfirmation(email, frontendBaseUrl);
+            // tenta enviar e-mail de confirmação (não quebra a resposta se falhar)
+            try {
+                accountConfirmationService.requestConfirmation(email, frontendBaseUrl);
+            } catch (Exception mailEx) {
+                System.err.println("[REGISTER WARN] failed to send confirmation e-mail: " + mailEx.getMessage());
+            }
 
             URI location = URI.create("/api/auth/find-user?email=" + email);
             return ResponseEntity.created(location)
                     .header(HttpHeaders.LOCATION, location.toString())
-                    .body(new MessageResponse("User registered. Please check your e-mail to confirm your account."));
+                    .body(new MessageResponse("User successfully registered. Please check your e-mail to confirm your account."));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new MessageResponse("E-mail is already registered"));
         } catch (Exception e) {
@@ -87,10 +95,9 @@ public class AuthController {
                     .body(new MessageResponse("Invalid credentials"));
         }
 
-        // Bloqueia login enquanto não confirmar o e-mail (sem reenvio automático aqui)
         if (!user.isEmailConfirmed()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Please confirm your e-mail before logging in."));
+                    .body(new MessageResponse("Please confirm your e-mail to sign in"));
         }
 
         String jwt = jwtService.generateToken(user.getEmail());
@@ -151,34 +158,5 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));
     }
 
-    // ====== CONFIRMAÇÃO DE CONTA ======
-
-    /** Resend: chamado apenas quando o frontend disser que “não chegou o e-mail”. */
-    @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<MessageResponse> resendConfirm(@RequestBody @Valid ResendConfirmRequest body) {
-        final String email = body.email().trim().toLowerCase();
-        // Não vaza existência: dispara para existentes, ignora se não existir.
-        accountConfirmationService.requestConfirmation(email, frontendBaseUrl);
-        return ResponseEntity.ok(new MessageResponse("If the e-mail exists, we’ve sent a new confirmation link."));
-    }
-
-    /** Verify: confirma conta via token recebido por e-mail. */
-    @PostMapping(value = "/confirm/verify", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<MessageResponse> verifyConfirm(@RequestBody @Valid ConfirmTokenRequest body) {
-        accountConfirmationService.confirm(body.token());
-        return ResponseEntity.ok(new MessageResponse("Account confirmed successfully."));
-    }
-
-    // records internos (sem criar novos arquivos)
     public record MessageResponse(String message) {}
-
-    public record ResendConfirmRequest(
-            @NotBlank
-            @Email(message = "Invalid e-mail")
-            @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
-                    message = "E-mail must contain a valid domain")
-            String email
-    ) {}
-
-    public record ConfirmTokenRequest(@NotBlank String token) {}
 }
