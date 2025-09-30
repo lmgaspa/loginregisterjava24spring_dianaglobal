@@ -2,6 +2,11 @@ spring:
   application:
     name: ${APPLICATION_NAME}
 
+    google:
+      oauth:
+        enabled: ${GOOGLE_OAUTH_ENABLED:false}  # defina true no Heroku quando quiser ativar
+    # GOOGLE_CLIENT_ID vem do ambiente (sem default aqui de propósito)
+
   data:
     mongodb:
       uri: ${MONGODB_URI}
