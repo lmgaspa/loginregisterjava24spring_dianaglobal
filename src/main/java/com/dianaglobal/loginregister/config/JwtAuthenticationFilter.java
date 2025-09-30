@@ -19,10 +19,23 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
-public class    JwtAuthenticationFilter extends OncePerRequestFilter {
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+
+    private static boolean isPublicAuthPath(String path, String method) {
+        // somente estes endpoints não exigem JWT:
+        return
+                path.equals("/api/auth/login") ||
+                        path.equals("/api/auth/register") ||
+                        path.equals("/api/auth/confirm-account") ||
+                        path.equals("/api/auth/confirm/resend") ||
+                        path.equals("/api/auth/forgot-password") ||
+                        path.equals("/api/auth/reset-password") ||
+                        path.equals("/api/auth/oauth/google"); // se exposto
+        // OBS: /api/auth/profile NÃO entra aqui (é protegido)
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -33,21 +46,20 @@ public class    JwtAuthenticationFilter extends OncePerRequestFilter {
         String method = request.getMethod();
         String path = request.getServletPath();
 
-        // 1) Preflight CORS nunca passa por validação
+        // Preflight CORS
         if ("OPTIONS".equalsIgnoreCase(method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 2) Rotas públicas de auth não exigem token
-        if (path.startsWith("/api/auth/")) {
+        // Rotas públicas (não autenticadas)
+        if (isPublicAuthPath(path, method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        final String authHeader = request.getHeader(org.springframework.http.HttpHeaders.AUTHORIZATION);
+        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // 3) Sem Authorization: deixe seguir; o Security decide se precisa autenticar
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -72,10 +84,10 @@ public class    JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
 
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Token expired. Please login again.");
         } catch (Exception e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Invalid token.");
         }
     }
