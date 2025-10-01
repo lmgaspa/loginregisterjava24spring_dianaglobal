@@ -2,109 +2,130 @@
 package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.adapter.out.mail.AccountConfirmationEmailService;
-import com.dianaglobal.loginregister.adapter.out.persistence.AccountConfirmationTokenRepository;
-import com.dianaglobal.loginregister.adapter.out.persistence.entity.AccountConfirmationTokenEntity;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AccountConfirmationService {
 
-    private final UserRepositoryPort userRepo;
-    private final AccountConfirmationTokenRepository tokenRepo;
+    private final UserRepositoryPort userRepository;
+
+    /** Serviço responsável por criar/validar/consumir tokens de confirmação. */
+    private final AccountConfirmationTokenService confirmationTokenService;
+
+    /** Serviço de e-mail (HTML) para enviar o link de confirmação. */
     private final AccountConfirmationEmailService emailService;
 
-    private static final int EXP_MINUTES = 45;
+    /** Validade (min) do token de confirmação. */
+    @Value("${application.confirmation.minutes:45}")
+    private int expirationMinutes;
 
+    /**
+     * Dispara (se existir usuário) um novo e-mail de confirmação.
+     * Não vaza existência de e-mail para o chamador – qualquer erro é apenas logado.
+     */
     public void requestConfirmation(String email, String frontendBaseUrl) {
-        requestConfirmation(email, frontendBaseUrl, null);
-    }
+        final String normalized = normalize(email);
+        if (normalized == null) return;
 
-    // nova sobrecarga com next
-    public void requestConfirmation(String email, String frontendBaseUrl, @Nullable String nextPath) {
-        // gere token normalmente...
-        String token = tokenService.createAccountConfirmationToken(email);
-
-        String link = frontendBaseUrl + "/confirm-account?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
-        if (nextPath != null && !nextPath.isBlank()) {
-            link += "&next=" + URLEncoder.encode(nextPath, StandardCharsets.UTF_8);
+        Optional<User> opt = userRepository.findByEmail(normalized);
+        if (opt.isEmpty()) {
+            // Não vazar existência de e-mail; apenas sair silenciosamente
+            log.debug("[CONFIRMATION] request for non-existing email {}", normalized);
+            return;
         }
-
-        emailService.send(email, /*toName*/ email, link, /*minutes*/ 45);
-        Optional<User> opt = userRepo.findByEmail(normalized);
-        if (opt.isEmpty()) return; // não vaza existência
 
         User user = opt.get();
+        String token = confirmationTokenService.issue(user.getId(), expirationMinutes);
 
-        // Apenas um token ativo por usuário
-        tokenRepo.deleteByUserId(user.getId());
-
-        // Gera token em texto puro (URL-safe) e salva apenas o hash
-        byte[] raw = new byte[32];
-        new SecureRandom().nextBytes(raw);
-        String tokenPlain = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
-        String tokenHash  = sha256Url(raw);
-
-        Instant expires = Instant.now().plusSeconds(EXP_MINUTES * 60L);
-
-        AccountConfirmationTokenEntity entity = AccountConfirmationTokenEntity.builder()
-                .id(UUID.randomUUID())
-                .userId(user.getId())
-                .tokenHash(tokenHash)
-                .createdAt(new Date())
-                .expiresAt(Date.from(expires))
-                .build();
-
-        tokenRepo.save(entity);
-
-        String link = frontendBaseUrl + "/confirm-account?token=" + tokenPlain;
-        emailService.send(user.getEmail(), user.getName(), link, EXP_MINUTES);
-    }
-
-    /** Valida o token e marca o usuário como confirmado; token torna-se single-use. */
-    @Transactional
-    public void confirm(String tokenPlain) {
-        final byte[] raw;
+        String linkUrl = buildConfirmLink(frontendBaseUrl, token);
         try {
-            raw = Base64.getUrlDecoder().decode(tokenPlain);
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Invalid or expired token");
-        }
-
-        String tokenHash = sha256Url(raw);
-
-        AccountConfirmationTokenEntity entity = tokenRepo
-                .findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, new Date())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired token"));
-
-        // marca usuário como confirmado
-        userRepo.markEmailConfirmed(entity.getUserId());
-
-        // evita reuso
-        entity.setUsedAt(new Date());
-        tokenRepo.save(entity);
-    }
-
-    private static String sha256Url(byte[] data) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+            emailService.send(user.getEmail(), user.getName(), linkUrl, expirationMinutes);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to hash token", e);
+            log.warn("[CONFIRMATION] failed to send email to {}: {}", normalized, e.getMessage());
         }
+    }
+
+    /**
+     * Sobrecarga opcional caso você queira forçar um 'name' (ex.: quando o nome ainda não está salvo).
+     * Evita conflito de variável local “link” usando outro identificador.
+     */
+    public void requestConfirmation(String email, String name, String frontendBaseUrl, boolean forceName) {
+        final String normalized = normalize(email);
+        if (normalized == null) return;
+
+        Optional<User> opt = userRepository.findByEmail(normalized);
+        if (opt.isEmpty()) {
+            log.debug("[CONFIRMATION] request (forceName) for non-existing email {}", normalized);
+            return;
+        }
+
+        User user = opt.get();
+        String token = confirmationTokenService.issue(user.getId(), expirationMinutes);
+
+        String confirmUrl = buildConfirmLink(frontendBaseUrl, token); // <- nome diferente de 'link' para evitar colisão
+        try {
+            String safeName = forceName ? (name == null ? "" : name) : user.getName();
+            emailService.send(user.getEmail(), safeName, confirmUrl, expirationMinutes);
+        } catch (Exception e) {
+            log.warn("[CONFIRMATION] failed to send email to {}: {}", normalized, e.getMessage());
+        }
+    }
+
+    /**
+     * Confirma o token: valida, consome e marca o e-mail como confirmado.
+     * Lança IllegalArgumentException para token inválido/expirado/já usado.
+     */
+    public void confirm(String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Invalid confirmation token");
+        }
+
+        AccountConfirmationTokenService.ConfirmationPayload payload =
+                confirmationTokenService.consume(token); // deve lançar se inválido/expirado/usado
+
+        UUID userId = payload.userId();
+        // Se seu UserRepositoryPort tiver um método específico:
+        userRepository.markEmailConfirmed(userId);
+        log.info("[CONFIRMATION] email confirmed for user {}", userId);
+    }
+
+    // ===== utils =====
+
+    private static String normalize(String email) {
+        if (email == null) return null;
+        String e = email.trim().toLowerCase();
+        return e.isBlank() ? null : e;
+    }
+
+    /**
+     * Monta o link para a sua página pública de confirmação (Next.js)
+     * Ex.: https://www.dianaglobal.com.br/confirm-account?token=...
+     */
+    private static String buildConfirmLink(String frontendBaseUrl, String token) {
+        String base = (frontendBaseUrl == null || frontendBaseUrl.isBlank())
+                ? "https://www.dianaglobal.com.br"
+                : frontendBaseUrl.trim();
+
+        // garante 1 barra antes do caminho
+        if (base.endsWith("/")) {
+            return base + "confirm-account?token=" + urlEncode(token);
+        }
+        return base + "/confirm-account?token=" + urlEncode(token);
+    }
+
+    private static String urlEncode(String v) {
+        return URLEncoder.encode(v, StandardCharsets.UTF_8);
     }
 }
