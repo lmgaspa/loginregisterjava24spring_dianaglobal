@@ -20,3 +20,5 @@ public class User {
     private String authProvider;      // "LOCAL" | "GOOGLE" | null
     private boolean passwordSet;      // true quando o usuário definiu senha conscientemente
 }
+
+//
