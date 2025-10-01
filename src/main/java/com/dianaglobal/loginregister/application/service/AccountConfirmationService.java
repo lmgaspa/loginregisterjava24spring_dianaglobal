@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -28,9 +30,21 @@ public class AccountConfirmationService {
 
     private static final int EXP_MINUTES = 45;
 
-    /** Emite um token (45 min), guarda apenas o hash e envia o link por e-mail. */
     public void requestConfirmation(String email, String frontendBaseUrl) {
-        final String normalized = email == null ? "" : email.trim().toLowerCase();
+        requestConfirmation(email, frontendBaseUrl, null);
+    }
+
+    // nova sobrecarga com next
+    public void requestConfirmation(String email, String frontendBaseUrl, @Nullable String nextPath) {
+        // gere token normalmente...
+        String token = tokenService.createAccountConfirmationToken(email);
+
+        String link = frontendBaseUrl + "/confirm-account?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+        if (nextPath != null && !nextPath.isBlank()) {
+            link += "&next=" + URLEncoder.encode(nextPath, StandardCharsets.UTF_8);
+        }
+
+        emailService.send(email, /*toName*/ email, link, /*minutes*/ 45);
         Optional<User> opt = userRepo.findByEmail(normalized);
         if (opt.isEmpty()) return; // não vaza existência
 
