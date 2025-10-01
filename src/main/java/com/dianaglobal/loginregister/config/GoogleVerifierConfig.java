@@ -13,17 +13,13 @@ import java.util.Collections;
 @Configuration
 public class GoogleVerifierConfig {
 
-    /**
-     * Só cria o bean quando google.oauth.enabled=true.
-     * GOOGLE_CLIENT_ID vem do ambiente; default vazio evita PlaceholderResolutionException.
-     */
     @Bean
     @ConditionalOnProperty(name = "google.oauth.enabled", havingValue = "true", matchIfMissing = false)
     public GoogleIdTokenVerifier googleTokenVerifier(
             @Value("${GOOGLE_CLIENT_ID:}") String clientId
     ) {
         if (clientId == null || clientId.isBlank()) {
-            throw new IllegalStateException("google.oauth.enabled=true, mas GOOGLE_CLIENT_ID não foi configurado.");
+            throw new IllegalStateException("google.oauth.enabled=true, but GOOGLE_CLIENT_ID is not configured.");
         }
         return new GoogleIdTokenVerifier
                 .Builder(new NetHttpTransport(), new GsonFactory())

@@ -1,3 +1,4 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/in/web/AuthController.java
 package com.dianaglobal.loginregister.adapter.in.web;
 
 import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
@@ -50,16 +51,11 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
-    // ✅ Necessário para o fluxo OAuth (registra/garante usuário Google)
-    private final RegisterUserService registerUserService;
-
     @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
 
-    // Mensagem simples
     public record MessageResponse(String message) {}
 
-    // Bean opcional (só existe quando google.oauth.enabled=true)
     @Autowired(required = false)
     private GoogleIdTokenVerifier googleTokenVerifier;
 
@@ -104,6 +100,13 @@ public class AuthController {
         }
 
         User user = userOpt.get();
+
+        // Conta criada via Google e sem senha definida -> bloquear login por senha
+        if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Use Sign in with Google or set a password first."));
+        }
+
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Invalid credentials"));
@@ -120,10 +123,7 @@ public class AuthController {
         return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
     }
 
-    /**
-     * Endpoint idempotente para Google OAuth.
-     * Verifica o ID token do Google, garante/cria o usuário e retorna JWT + refresh do seu backend.
-     */
+    /** Google OAuth: verifica id_token, garante usuário e retorna tokens próprios. */
     @PostMapping(value = "/oauth/google", consumes = "application/json", produces = "application/json")
     public ResponseEntity<?> oauthWithGoogle(@RequestBody @Valid OAuthGoogleRequest req) {
         if (googleTokenVerifier == null) {
@@ -151,21 +151,8 @@ public class AuthController {
 
             email = email.trim().toLowerCase();
 
-            var userOpt = userRepositoryPort.findByEmail(email);
-            User user;
-            if (userOpt.isPresent()) {
-                user = userOpt.get();
-            } else {
-                // Cria usuário já confirmado para OAuth
-                registerUserService.registerOauthUser(name, email, sub);
-                user = userRepositoryPort.findByEmail(email)
-                        .orElseThrow(() -> new IllegalStateException("User creation failed"));
-            }
-
-            if (!user.isEmailConfirmed()) {
-                user.setEmailConfirmed(true);
-                userRepositoryPort.save(user);
-            }
+            // Idempotente: sempre retorna o User válido (existente/atualizado ou criado)
+            User user = registerService.registerOauthUser(name, email, sub);
 
             String jwt = jwtService.generateToken(user.getEmail());
             String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
@@ -176,6 +163,35 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new MessageResponse("Internal error"));
         }
+    }
+
+    /** Definir/alterar senha para contas (inclui contas criadas via Google). */
+    public record NewPasswordDTO(
+            @jakarta.validation.constraints.Pattern(
+                    regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d).{8,}$",
+                    message = "Password must include at least 1 uppercase letter, 1 lowercase letter, and 1 digit and be at least 8 characters"
+            ) String newPassword
+    ) {}
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping(value = "/password/set", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<MessageResponse> setPassword(
+            @AuthenticationPrincipal UserDetails principal,
+            @RequestBody @Valid NewPasswordDTO body
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Not authenticated"));
+        }
+
+        var user = userRepositoryPort.findByEmail(principal.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        user.setPassword(passwordEncoder.encode(body.newPassword()));
+        user.setPasswordSet(true); // agora pode logar por senha
+        userRepositoryPort.save(user);
+
+        return ResponseEntity.ok(new MessageResponse("Password set successfully"));
     }
 
     @GetMapping(value = "/profile", produces = "application/json")
@@ -206,7 +222,8 @@ public class AuthController {
     public ResponseEntity<?> findUser(
             @RequestParam
             @Email(message = "Invalid e-mail")
-            @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+            @Pattern(
+                    regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
                     message = "E-mail must contain a valid domain")
             String email) {
 
@@ -248,7 +265,6 @@ public class AuthController {
         }
     }
 
-    /** Reenvia link de confirmação sem vazar existência de e-mail. */
     @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> resendConfirmation(@Valid @RequestBody ForgotPasswordRequest req) {
         try {
