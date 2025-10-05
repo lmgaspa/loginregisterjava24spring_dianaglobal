@@ -12,6 +12,10 @@ spring:
       uri: ${MONGODB_URI}
       auto-index-creation: true
       uuid-representation: standard
+  # logging opcional
+  logging:
+    level:
+      org.springframework.data.mongodb: info
 
   mail:
     host: ${MAIL_HOST}

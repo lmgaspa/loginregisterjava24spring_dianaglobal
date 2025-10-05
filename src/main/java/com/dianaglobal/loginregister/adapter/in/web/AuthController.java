@@ -1,20 +1,23 @@
-// src/main/java/com/dianaglobal/loginregister/adapter/in/web/AuthController.java
 package com.dianaglobal.loginregister.adapter.in.web;
 
 import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.OAuthGoogleRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.ProfileResponseDTO;
-import com.dianaglobal.loginregister.adapter.in.dto.RefreshRequestDTO;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.password.RegisterRequest;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
-import com.dianaglobal.loginregister.application.service.*;
+import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
+import com.dianaglobal.loginregister.application.service.JwtService;
+import com.dianaglobal.loginregister.application.service.RefreshTokenService;
+import com.dianaglobal.loginregister.application.service.UserService;
 import com.dianaglobal.loginregister.domain.model.User;
+import com.dianaglobal.loginregister.security.CsrfTokenService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
@@ -25,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,6 +38,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.UUID;
 
 @Slf4j
@@ -51,14 +56,68 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
+    // >>> Novo: serviço de CSRF <<<
+    private final CsrfTokenService csrfTokenService;
+
     @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
+
+    @Value("${application.cookies.secure:true}")
+    private boolean cookiesSecure;
+
+    // duração típica de refresh (ex.: 30 dias)
+    @Value("${application.auth.refresh-ttl-days:30}")
+    private long refreshTtlDays;
 
     public record MessageResponse(String message) {}
 
     @Autowired(required = false)
     private GoogleIdTokenVerifier googleTokenVerifier;
 
+    // ---------- helpers de cookie ----------
+    private void setAuthCookies(HttpServletResponse response, String refresh, String csrf) {
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", refresh)
+                .httpOnly(true)
+                .secure(cookiesSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(Duration.ofDays(refreshTtlDays))
+                .build();
+
+        ResponseCookie csrfCookie = ResponseCookie.from("csrf_token", csrf)
+                .httpOnly(false) // legível pelo front para mandar em X-CSRF-Token
+                .secure(cookiesSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ofDays(refreshTtlDays))
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, csrfCookie.toString());
+    }
+
+    private void clearAuthCookies(HttpServletResponse response) {
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", "")
+                .httpOnly(true)
+                .secure(cookiesSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(0)
+                .build();
+
+        ResponseCookie csrfCookie = ResponseCookie.from("csrf_token", "")
+                .httpOnly(false)
+                .secure(cookiesSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, csrfCookie.toString());
+    }
+
+    // ---------- REGISTER ----------
     @PostMapping(value = "/register", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> register(@RequestBody @Valid RegisterRequest request) {
         final String name = request.name() == null ? null : request.name().trim();
@@ -91,25 +150,23 @@ public class AuthController {
         }
     }
 
+    // ---------- LOGIN (password) ----------
     @PostMapping(value = "/login", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest request, HttpServletResponse response) {
         var userOpt = userRepositoryPort.findByEmail(request.email().trim().toLowerCase());
         if (userOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Invalid credentials"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid credentials"));
         }
 
         User user = userOpt.get();
 
-        // Conta criada via Google e sem senha definida -> bloquear login por senha
         if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new MessageResponse("Use Sign in with Google or set a password first."));
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Invalid credentials"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid credentials"));
         }
 
         if (!user.isEmailConfirmed()) {
@@ -117,15 +174,19 @@ public class AuthController {
                     .body(new MessageResponse("Please confirm your e-mail to sign in"));
         }
 
-        String jwt = jwtService.generateToken(user.getEmail());
-        String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
+        // access vai no body; refresh/CSRF em cookie
+        String access = jwtService.generateToken(user.getEmail());
+        var refreshModel = refreshTokenService.create(user.getEmail()); // persiste/rotaciona no servidor
+        String refresh = refreshModel.getToken();
+        String csrf = csrfTokenService.generateCsrfToken(user.getEmail()); // <<< trocado
 
-        return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
+        setAuthCookies(response, refresh, csrf);
+        return ResponseEntity.ok(new LoginResponse(access, null)); // refresh não é mais retornado no body
     }
 
-    /** Google OAuth: verifica id_token, garante usuário e retorna tokens próprios. */
+    // ---------- LOGIN (Google OAuth) ----------
     @PostMapping(value = "/oauth/google", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<?> oauthWithGoogle(@RequestBody @Valid OAuthGoogleRequest req) {
+    public ResponseEntity<?> oauthWithGoogle(@RequestBody @Valid OAuthGoogleRequest req, HttpServletResponse response) {
         if (googleTokenVerifier == null) {
             return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
                     .body(new MessageResponse("Google OAuth not configured on the server"));
@@ -150,14 +211,15 @@ public class AuthController {
             }
 
             email = email.trim().toLowerCase();
-
-            // Idempotente: sempre retorna o User válido (existente/atualizado ou criado)
             User user = registerService.registerOauthUser(name, email, sub);
 
-            String jwt = jwtService.generateToken(user.getEmail());
-            String refreshToken = refreshTokenService.create(user.getEmail()).getToken();
+            String access = jwtService.generateToken(user.getEmail());
+            var refreshModel = refreshTokenService.create(user.getEmail());
+            String refresh = refreshModel.getToken();
+            String csrf = csrfTokenService.generateCsrfToken(user.getEmail()); // <<< trocado
 
-            return ResponseEntity.ok(new LoginResponse(jwt, refreshToken));
+            setAuthCookies(response, refresh, csrf);
+            return ResponseEntity.ok(new LoginResponse(access, null));
         } catch (Exception e) {
             log.error("[GOOGLE OAUTH ERROR] {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -165,7 +227,7 @@ public class AuthController {
         }
     }
 
-    /** Definir/alterar senha para contas (inclui contas criadas via Google). */
+    // ---------- SET PASSWORD ----------
     public record NewPasswordDTO(
             @jakarta.validation.constraints.Pattern(
                     regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d).{8,}$",
@@ -188,12 +250,13 @@ public class AuthController {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         user.setPassword(passwordEncoder.encode(body.newPassword()));
-        user.setPasswordSet(true); // agora pode logar por senha
+        user.setPasswordSet(true);
         userRepositoryPort.save(user);
 
         return ResponseEntity.ok(new MessageResponse("Password set successfully"));
     }
 
+    // ---------- PROFILE ----------
     @GetMapping(value = "/profile", produces = "application/json")
     public ResponseEntity<?> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
@@ -207,17 +270,38 @@ public class AuthController {
         return ResponseEntity.ok(new ProfileResponseDTO(user.getId(), user.getName(), user.getEmail()));
     }
 
-    @PostMapping(value = "/refresh-token", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<?> refresh(@RequestBody @Valid RefreshRequestDTO body) {
-        if (!refreshTokenService.validate(body.refreshToken())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Invalid or expired refresh token"));
+    // ---------- REFRESH (lê cookies + header CSRF) ----------
+    @PostMapping(value = "/refresh-token", produces = "application/json")
+    public ResponseEntity<?> refresh(
+            @CookieValue(name = "refresh_token", required = false) String refreshCookie,
+            @CookieValue(name = "csrf_token", required = false) String csrfCookie,
+            @RequestHeader(name = "X-CSRF-Token", required = false) String csrfHeader,
+            HttpServletResponse response
+    ) {
+        if (refreshCookie == null || refreshCookie.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Missing refresh cookie"));
         }
-        String email = refreshTokenService.getEmailByToken(body.refreshToken());
-        String newToken = jwtService.generateToken(email);
-        return ResponseEntity.ok(new JwtResponse(newToken));
+
+        // validação CSRF: header deve bater com o cookie
+        if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageResponse("Invalid CSRF token"));
+        }
+
+        if (!refreshTokenService.validate(refreshCookie)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid or expired refresh token"));
+        }
+
+        String email = refreshTokenService.getEmailByToken(refreshCookie);
+        String newAccess = jwtService.generateToken(email);
+
+        // (Opcional) Rotacionar refresh a cada refresh:
+        // var rotated = refreshTokenService.rotate(email, refreshCookie);
+        // setAuthCookies(response, rotated.getToken(), csrfTokenService.generateCsrfToken(email));
+
+        return ResponseEntity.ok(new JwtResponse(newAccess));
     }
 
+    // ---------- FIND USER ----------
     @GetMapping(value = "/find-user", produces = "application/json")
     public ResponseEntity<?> findUser(
             @RequestParam
@@ -234,19 +318,37 @@ public class AuthController {
                         .body(new MessageResponse("User not found")));
     }
 
-    @PreAuthorize("isAuthenticated()")
-    @PostMapping(value = "/logout", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<MessageResponse> logout(@RequestBody @Valid RefreshRequestDTO body) {
-        refreshTokenService.revokeToken(body.refreshToken());
+    // ---------- LOGOUT (apaga cookies + revoga refresh) ----------
+    @PostMapping(value = "/logout", produces = "application/json")
+    public ResponseEntity<MessageResponse> logout(
+            @CookieValue(name = "refresh_token", required = false) String refreshCookie,
+            HttpServletResponse response
+    ) {
+        if (refreshCookie != null && !refreshCookie.isBlank()) {
+            try {
+                refreshTokenService.revokeToken(refreshCookie);
+            } catch (Exception ex) {
+                log.warn("[LOGOUT] revoke failed: {}", ex.getMessage());
+            }
+        }
+        clearAuthCookies(response);
         return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
     }
 
-    @PostMapping(value = "/revoke-refresh", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<MessageResponse> revokeRefresh(@RequestBody @Valid RefreshRequestDTO body) {
-        refreshTokenService.revokeToken(body.refreshToken());
-        return ResponseEntity.ok(new MessageResponse("Refresh token revoked"));
+    // ---------- Reenviar confirmação ----------
+    @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<MessageResponse> resendConfirmation(@Valid @RequestBody ForgotPasswordRequest req) {
+        try {
+            accountConfirmationService.requestConfirmation(req.email(), frontendBaseUrl);
+        } catch (Exception e) {
+            log.warn("[CONFIRM RESEND WARN] {}", e.getMessage());
+        }
+        return ResponseEntity.ok(new MessageResponse(
+                "If an account exists for this e-mail, we have sent a new confirmation link."
+        ));
     }
 
+    // ---------- Confirmar conta ----------
     @PostMapping(value = "/confirm-account", produces = "application/json")
     public ResponseEntity<MessageResponse> confirmAccount(@RequestParam("token") String token) {
         try {
@@ -263,17 +365,5 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new MessageResponse("Internal error. Code: " + id));
         }
-    }
-
-    @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<MessageResponse> resendConfirmation(@Valid @RequestBody ForgotPasswordRequest req) {
-        try {
-            accountConfirmationService.requestConfirmation(req.email(), frontendBaseUrl);
-        } catch (Exception e) {
-            log.warn("[CONFIRM RESEND WARN] {}", e.getMessage());
-        }
-        return ResponseEntity.ok(new MessageResponse(
-                "If an account exists for this e-mail, we have sent a new confirmation link."
-        ));
     }
 }
