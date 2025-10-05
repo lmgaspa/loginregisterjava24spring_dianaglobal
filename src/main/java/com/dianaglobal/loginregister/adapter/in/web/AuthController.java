@@ -79,7 +79,7 @@ public class AuthController {
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", refresh)
                 .httpOnly(true)
                 .secure(cookiesSecure)
-                .sameSite("Lax")
+                .sameSite("None")  // <= AQUI
                 .path("/api/auth")
                 .maxAge(Duration.ofDays(refreshTtlDays))
                 .build();
@@ -87,8 +87,8 @@ public class AuthController {
         ResponseCookie csrfCookie = ResponseCookie.from("csrf_token", csrf)
                 .httpOnly(false) // legível pelo front para mandar em X-CSRF-Token
                 .secure(cookiesSecure)
-                .sameSite("Lax")
-                .path("/")
+                .sameSite("None")  // <= AQUI
+                .path("/api/auth")
                 .maxAge(Duration.ofDays(refreshTtlDays))
                 .build();
 
