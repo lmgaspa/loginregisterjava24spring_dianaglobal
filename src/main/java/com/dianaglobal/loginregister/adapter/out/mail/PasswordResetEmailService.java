@@ -5,6 +5,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -28,7 +29,7 @@ public class PasswordResetEmailService {
     @Value("${application.brand.name:Diana Global}")
     private String appName;
 
-    /** Mantém o path de classpath, sem inline/CID nem URL absoluta. */
+    /** Mesmo path e arquivo do PixEmailService. */
     @Value("${mail.logo.classpath:static/images/logo-andescore.jpeg}")
     private String logoClasspath;
 
@@ -59,12 +60,20 @@ public class PasswordResetEmailService {
             String html = buildHtml(name, link, minutes);
 
             MimeMessage message = mailSender.createMimeMessage();
-            // sem inline => multipart=false
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            // multipart=true para permitir inline image (CID)
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
             try { helper.setFrom(username, appName); } catch (Exception ignore) { helper.setFrom(username); }
+
+            // Inline logo (CID igual ao PixEmailService)
+            ClassPathResource logoRes = new ClassPathResource(logoClasspath);
+            if (logoRes.exists()) {
+                helper.addInline("logoAndesCore", logoRes);
+            } else {
+                log.warn("Logo não encontrada em {}", logoClasspath);
+            }
 
             mailSender.send(message);
             log.info("Password reset e-mail sent to {}", to);
@@ -79,15 +88,6 @@ public class PasswordResetEmailService {
         int year = Year.now().getValue();
         String subtitle = "Password reset";
 
-        // "static/images/..." -> "/images/..."
-        String logoPath = toWebPath(logoClasspath);
-
-        String logoCell = """
-            <td style="width:64px;vertical-align:middle;">
-              <img src="%s" alt="Logo" width="56" style="display:block;border-radius:6px;">
-            </td>
-        """.formatted(escapeHtml(logoPath));
-
         return """
             <!doctype html>
             <html lang="en">
@@ -99,11 +99,13 @@ public class PasswordResetEmailService {
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
 
-                <!-- HEADER -->
+                <!-- HEADER: igual ao PixEmailService -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
-                      %s
+                      <td style="width:64px;vertical-align:middle;">
+                        <img src="cid:logoAndesCore" alt="AndesCore Software" width="56" style="display:block;border-radius:6px;">
+                      </td>
                       <td style="text-align:right;vertical-align:middle;">
                         <div style="font-weight:700;font-size:18px;line-height:1;"><strong>AndesCore Software</strong></div>
                         <div style="height:6px;line-height:6px;font-size:0;">&nbsp;</div>
@@ -113,7 +115,7 @@ public class PasswordResetEmailService {
                   </table>
                 </div>
 
-                <!-- CONTENT -->
+                <!-- CONTEÚDO -->
                 <div style="padding:24px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
                   <p style="margin:0 0 12px;line-height:1.55">
@@ -137,7 +139,7 @@ public class PasswordResetEmailService {
                   </p>
                 </div>
 
-                <!-- FOOTER -->
+                <!-- FOOTER: igual ao PixEmailService -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
                             padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
@@ -149,7 +151,6 @@ public class PasswordResetEmailService {
             </html>
             """.formatted(
                 EMAIL_TITLE,
-                logoCell,
                 subtitle,
                 safeName,
                 appName,
@@ -160,15 +161,11 @@ public class PasswordResetEmailService {
         );
     }
 
-    /** "static/images/logo.jpeg" -> "/images/logo.jpeg" */
-    private String toWebPath(String classpath) {
-        if (classpath == null || classpath.isBlank()) return "/images/logo-andescore.jpeg";
-        String path = classpath.startsWith("static/") ? classpath.substring("static/".length()) : classpath;
-        return path.startsWith("/") ? path : "/" + path;
-    }
-
     private static String escapeHtml(String s) {
-        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-                .replace("\"","&quot;").replace("'","&#x27;");
+        return s.replace("&","&amp;")
+                .replace("<","&lt;")
+                .replace(">","&gt;")
+                .replace("\"","&quot;")
+                .replace("'","&#x27;");
     }
 }
