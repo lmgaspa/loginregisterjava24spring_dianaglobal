@@ -5,12 +5,14 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
 import java.util.Properties;
 
 @Slf4j
@@ -26,6 +28,10 @@ public class AccountConfirmationEmailService {
 
     @Value("${application.brand.name:Diana Global}")
     private String brandName;
+
+    /** Caminho da logo no classpath (igual ao modelo Pix). */
+    @Value("${mail.logo.classpath:static/images/logo-andescore.jpeg}")
+    private String logoClasspath;
 
     private JavaMailSender mailSender;
 
@@ -55,13 +61,27 @@ public class AccountConfirmationEmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
                     message,
-                    MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+                    true, // multipart p/ permitir inline image
                     StandardCharsets.UTF_8.name()
             );
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
-            // helper.setFrom(username, brandName); // se o provedor exigir
+
+            // Opcional: definir "from"
+            try {
+                helper.setFrom(username, brandName);
+            } catch (Exception ignore) {
+                helper.setFrom(username);
+            }
+
+            // Inline logo (CID: "logoAndesCore"), como no modelo Pix
+            ClassPathResource logoRes = new ClassPathResource(logoClasspath);
+            if (logoRes.exists()) {
+                helper.addInline("logoAndesCore", logoRes);
+            } else {
+                log.warn("Logo não encontrada em {}", logoClasspath);
+            }
 
             mailSender.send(message);
             log.info("Account confirmation e-mail sent to {}", toEmail);
@@ -72,9 +92,12 @@ public class AccountConfirmationEmailService {
     }
 
     private String buildHtml(String name, String link, int minutes) {
-        String title = brandName + " – Confirm your account";
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
+        String title = brandName + " – Confirm your account";
+        String subtitle = "Confirm your account";
+        int year = Year.now().getValue();
 
+        // Header + Footer copiados do modelo Pix (gradiente + CID da logo)
         return """
             <!doctype html>
             <html lang="en">
@@ -82,52 +105,66 @@ public class AccountConfirmationEmailService {
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
               <title>%s</title>
-              <style>
-                body{background:#f3f4f6;margin:0;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#111827;}
-                .card{max-width:640px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);}
-                .header{background:#111827;color:#fff;padding:16px 24px;font-size:18px;font-weight:600}
-                .content{padding:24px}
-                .greet{font-size:16px;margin:0 0 12px}
-                .p{margin:0 0 12px;line-height:1.55}
-                .btn{display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;background:#111827;color:#fff;font-weight:600}
-                .muted{font-size:12px;color:#6b7280;margin-top:16px}
-                .footer{padding:12px 24px;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb}
-                a.btn:link,a.btn:visited{color:#fff}
-                @media (prefers-color-scheme: dark){
-                  body{background:#0b0b0c;color:#e5e7eb}
-                  .card{background:#16181d;box-shadow:none;border:1px solid #22252b}
-                  .header{background:#0b0b0c}
-                  .btn{background:#e5e7eb;color:#0b0b0c}
-                  .footer{border-top-color:#22252b;color:#9ca3af}
-                }
-              </style>
             </head>
-            <body>
-              <div class="card">
-                <div class="header">%s</div>
-                <div class="content">
-                  <p class="greet">Hello, %s!</p>
-                  <p class="p">Thanks for signing up. Please confirm your account:</p>
-                  <p style="margin:20px 0">
-                    <a class="btn" href="%s" target="_blank" rel="noopener noreferrer">Confirm my account</a>
-                  </p>
-                  <p class="p">For your security, this link expires in <strong>%d minutes</strong> and can be used only once.</p>
-                  <p class="muted">If the button doesn’t work, copy and paste this link into your browser:<br>%s</p>
+            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
+              <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+
+                <!-- HEADER: mesmo do PixEmailService -->
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
+                  <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+                    <tr>
+                      <td style="width:64px;vertical-align:middle;">
+                        <img src="cid:logoAndesCore" alt="AndesCore Software" width="56" style="display:block;border-radius:6px;">
+                      </td>
+                      <td style="text-align:right;vertical-align:middle;">
+                        <div style="font-weight:700;font-size:18px;line-height:1;"><strong>AndesCore Software</strong></div>
+                        <div style="height:6px;line-height:6px;font-size:0;">&nbsp;</div>
+                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">%s</div>
+                      </td>
+                    </tr>
+                  </table>
                 </div>
-                <div class="footer">
-                  © 2025 %s. All rights reserved.
+
+                <!-- CONTEÚDO PRÓPRIO DE CONFIRMAÇÃO -->
+                <div style="padding:24px">
+                  <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
+                  <p style="margin:0 0 12px;line-height:1.55">
+                    Thanks for signing up to <strong>%s</strong>. Please confirm your account:
+                  </p>
+                  <p style="margin:20px 0">
+                    <a href="%s" target="_blank" rel="noopener noreferrer"
+                       style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
+                              background:#111827;color:#fff;font-weight:600">
+                      Confirm my account
+                    </a>
+                  </p>
+                  <p style="margin:0 0 12px;line-height:1.55">
+                    For your security, this link expires in <strong>%d minutes</strong> and can be used only once.
+                  </p>
+                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
+                    If the button doesn’t work, copy and paste this link into your browser:<br>%s
+                  </p>
+                </div>
+
+                <!-- FOOTER: mesmo do PixEmailService -->
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
+                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="raio"
+                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
                 title,
-                title,
+                subtitle,
                 safeName,
+                brandName,
                 link,
-                minutes,   // <- INT aqui
+                minutes,
                 link,
-                brandName
+                year
         );
     }
 

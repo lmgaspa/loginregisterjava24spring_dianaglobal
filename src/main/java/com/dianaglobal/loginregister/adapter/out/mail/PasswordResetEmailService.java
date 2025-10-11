@@ -5,12 +5,14 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
 import java.util.Properties;
 
 @Slf4j
@@ -25,11 +27,17 @@ public class PasswordResetEmailService {
     @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
     @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
 
-    // ---- Branding constants ----
-    private static final String APP_NAME = "Diana Global";
-    private static final String EMAIL_TITLE = "Diana Global – Password Reset";
+    // ---- Branding ----
+    @Value("${application.brand.name:Diana Global}")
+    private String appName;
+
+    /** Caminho da logo no classpath (igual ao PixEmailService). */
+    @Value("${mail.logo.classpath:static/images/logo-andescore.jpeg}")
+    private String logoClasspath;
 
     private JavaMailSender mailSender;
+
+    private static final String EMAIL_TITLE = "Diana Global – Password Reset";
 
     @PostConstruct
     void init() {
@@ -43,7 +51,7 @@ public class PasswordResetEmailService {
         Properties props = impl.getJavaMailProperties();
         props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
         props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        // props.put("mail.debug", "true"); // optional
+        // props.put("mail.debug", "true"); // opcional
 
         this.mailSender = impl;
         log.info("PasswordResetEmailService initialized with host={} port={}", host, port);
@@ -64,25 +72,42 @@ public class PasswordResetEmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
                     message,
-                    MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+                    true, // multipart para permitir inline image
                     StandardCharsets.UTF_8.name()
             );
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
-            // If your provider requires an explicit From:
-            // helper.setFrom(username, APP_NAME);
+
+            // From opcional (alguns provedores exigem apenas o e-mail, sem personal name)
+            try {
+                helper.setFrom(username, appName);
+            } catch (Exception ignore) {
+                helper.setFrom(username);
+            }
+
+            // Inline logo (CID igual ao PixEmailService)
+            ClassPathResource logoRes = new ClassPathResource(logoClasspath);
+            if (logoRes.exists()) {
+                helper.addInline("logoAndesCore", logoRes);
+            } else {
+                log.warn("Logo não encontrada em {}", logoClasspath);
+            }
 
             mailSender.send(message);
+            log.info("Password reset e-mail sent to {}", to);
         } catch (Exception e) {
             log.error("Error sending password reset e-mail to {}: {}", to, e.getMessage(), e);
             throw new RuntimeException("Failed to send password reset e-mail", e);
         }
     }
 
-    // ---- E-mail HTML (fixed content for Diana Global) ----
+    // ---- E-mail HTML com mesmo header/footer do Pix ----
     private String buildHtml(String name, String link, int minutes) {
-        String safeName = (name == null || name.isBlank()) ? "customer" : name;
+        String safeName = (name == null || name.isBlank()) ? "customer" : escapeHtml(name);
+        int year = Year.now().getValue();
+        String subtitle = "Password reset";
+
         return """
             <!doctype html>
             <html lang="en">
@@ -90,53 +115,69 @@ public class PasswordResetEmailService {
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
               <title>%s</title>
-              <style>
-                body{background:#f3f4f6;margin:0;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#111827;}
-                .card{max-width:640px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);}
-                .header{background:#111827;color:#fff;padding:16px 24px;font-size:18px;font-weight:600}
-                .content{padding:24px}
-                .greet{font-size:16px;margin:0 0 12px}
-                .p{margin:0 0 12px;line-height:1.55}
-                .btn{display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;background:#111827;color:#fff;font-weight:600}
-                .muted{font-size:12px;color:#6b7280;margin-top:16px}
-                .footer{padding:12px 24px;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb}
-                a.btn:link,a.btn:visited{color:#fff}
-                @media (prefers-color-scheme: dark){
-                  body{background:#0b0b0c;color:#e5e7eb}
-                  .card{background:#16181d;box-shadow:none;border:1px solid #22252b}
-                  .header{background:#0b0b0c}
-                  .btn{background:#e5e7eb;color:#0b0b0c}
-                  .footer{border-top-color:#22252b;color:#9ca3af}
-                }
-              </style>
             </head>
-            <body>
-              <div class="card">
-                <div class="header">%s</div>
-                <div class="content">
-                  <p class="greet">Hello, %s!</p>
-                  <p class="p">We received a request to reset your password.</p>
-                  <p class="p">To continue, click the button below. The link expires in <strong>%d minutes</strong>.</p>
-                  <p style="margin:20px 0">
-                    <a class="btn" href="%s" target="_blank" rel="noopener noreferrer">Reset my password</a>
-                  </p>
-                  <p class="p">If you did not request this change, you can safely ignore this e-mail.</p>
-                  <p class="muted">If the button does not work, copy and paste this link into your browser:<br>%s</p>
+            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
+              <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+
+                <!-- HEADER (mesmo do PixEmailService) -->
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
+                  <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+                    <tr>
+                      <td style="width:64px;vertical-align:middle;">
+                        <img src="cid:logoAndesCore" alt="AndesCore Software" width="56" style="display:block;border-radius:6px;">
+                      </td>
+                      <td style="text-align:right;vertical-align:middle;">
+                        <div style="font-weight:700;font-size:18px;line-height:1;"><strong>AndesCore Software</strong></div>
+                        <div style="height:6px;line-height:6px;font-size:0;">&nbsp;</div>
+                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">%s</div>
+                      </td>
+                    </tr>
+                  </table>
                 </div>
-                <div class="footer">
-                  © 2025 %s. All rights reserved.
+
+                <!-- CONTEÚDO -->
+                <div style="padding:24px">
+                  <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
+                  <p style="margin:0 0 12px;line-height:1.55">
+                    We received a request to reset your password for <strong>%s</strong>.
+                  </p>
+                  <p style="margin:0 0 12px;line-height:1.55">
+                    To continue, click the button below. The link expires in <strong>%d minutes</strong>.
+                  </p>
+                  <p style="margin:20px 0">
+                    <a href="%s" target="_blank" rel="noopener noreferrer"
+                       style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
+                              background:#111827;color:#fff;font-weight:600">
+                      Reset my password
+                    </a>
+                  </p>
+                  <p style="margin:0 0 12px;line-height:1.55">
+                    If you did not request this change, you can safely ignore this e-mail.
+                  </p>
+                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
+                    If the button doesn’t work, copy and paste this link into your browser:<br>%s
+                  </p>
+                </div>
+
+                <!-- FOOTER (mesmo do PixEmailService) -->
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
+                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="raio"
+                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
-                EMAIL_TITLE,          // <title>
-                EMAIL_TITLE,          // header
-                escapeHtml(safeName), // greeting
+                EMAIL_TITLE,     // <title>
+                subtitle,        // header subtitle
+                safeName,        // greeting
+                appName,         // app name in body
                 minutes,
                 link,
                 link,
-                APP_NAME              // footer
+                year
         );
     }
 
