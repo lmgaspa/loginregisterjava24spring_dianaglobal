@@ -111,20 +111,20 @@ public class PasswordResetEmailService {
                 <!-- CONTEÚDO -->
                 <div style="padding:24px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
-                  <p style="margin:0 0 12px;line-height:1.55">
+                  <p style="margin:0 0 8px;line-height:1.55">
                     We received a request to reset your password for <strong>%s</strong>.
                   </p>
-                  <p style="margin:0 0 12px;line-height:1.55">
+                  <p style="margin:0 0 8px;line-height:1.55">
                     To continue, click the button below. The link expires in <strong>%d minutes</strong>.
                   </p>
-                  <p style="margin:16px 0">
+                  <p style="margin:14px 0">
                     <a href="%s" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
                               background:#111827;color:#fff;font-weight:600">
                       Reset my password
                     </a>
                   </p>
-                  <p style="margin:0 0 12px;line-height:1.55">
+                  <p style="margin:0 0 8px;line-height:1.55">
                     If you did not request this change, you can safely ignore this e-mail.
                   </p>
                   <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
