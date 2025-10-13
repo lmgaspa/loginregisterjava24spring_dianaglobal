@@ -127,14 +127,14 @@ public class PasswordResetEmailService {
                   <p style="margin:0 0 8px;line-height:1.55">
                     If you did not request this change, you can safely ignore this e-mail.
                   </p>
-                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
+                  <p style="font-size:12px;color:#6b7280;margin-top:8px;word-break:break-all">
                     If the button doesn’t work, copy and paste this link into your browser:<br>%s
                   </p>
                 </div>
 
                 <!-- FOOTER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                            padding:6px 18px; margintTop:8px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
                   <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
