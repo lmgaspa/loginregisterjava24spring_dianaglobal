@@ -29,9 +29,8 @@ public class PasswordResetEmailService {
     @Value("${application.brand.name:Diana Global}")
     private String appName;
 
-    /** Mesmo path e arquivo do PixEmailService. */
-    @Value("${mail.logo.classpath:static/images/logo-andescore.jpeg}")
-    private String logoClasspath;
+    @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
+    private String logoUrl;
 
     private JavaMailSender mailSender;
 
@@ -61,19 +60,11 @@ public class PasswordResetEmailService {
 
             MimeMessage message = mailSender.createMimeMessage();
             // multipart=true para permitir inline image (CID)
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
             try { helper.setFrom(username, appName); } catch (Exception ignore) { helper.setFrom(username); }
-
-            // Inline logo (CID igual ao PixEmailService)
-            ClassPathResource logoRes = new ClassPathResource(logoClasspath);
-            if (logoRes.exists()) {
-                helper.addInline("logoAndesCore", logoRes);
-            } else {
-                log.warn("Logo não encontrada em {}", logoClasspath);
-            }
 
             mailSender.send(message);
             log.info("Password reset e-mail sent to {}", to);
