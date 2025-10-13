@@ -5,7 +5,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -19,6 +18,7 @@ import java.util.Properties;
 @Component
 public class AccountConfirmationEmailService {
 
+    // ==== SMTP CONFIG =========================================================
     @Value("${mail.host}") private String host;
     @Value("${mail.port}") private int port;
     @Value("${mail.username}") private String username;
@@ -26,13 +26,31 @@ public class AccountConfirmationEmailService {
     @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
     @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
 
+    // ==== BRAND / ASSETS ======================================================
     @Value("${application.brand.name:Diana Global}")
     private String brandName;
 
-    @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
+    // Use a small, optimized image (e.g., 112x112 PNG/WebP) to keep message size low.
+    @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore-112.png}")
     private String logoUrl;
 
     private JavaMailSender mailSender;
+
+    // ==== THEME TOKENS (OCP: override in subclasses to re-skin) ===============
+    protected String bgHeaderStart() { return "#0a2239"; }
+    protected String bgHeaderEnd()   { return "#0e4b68"; }
+    protected String textPrimary()   { return "#111827"; }   // neutral dark
+    protected String textMuted()     { return "#6b7280"; }
+    protected String buttonBg()      { return "#111827"; }
+    protected String buttonText()    { return "#ffffff"; }
+    protected String cardBorder()    { return "#eeeeee"; }
+    protected String pageBg()        { return "#f6f7f9"; }
+    protected String boltColor()     { return "#ffd200"; }
+
+    // Explicit logo box to avoid layout shift
+    protected int logoBox()    { return 56; }
+    protected int logoWidth()  { return 56; }
+    protected int logoHeight() { return 56; }
 
     @PostConstruct
     void init() {
@@ -51,27 +69,19 @@ public class AccountConfirmationEmailService {
         log.info("AccountConfirmationEmailService initialized with host={} port={}", host, port);
     }
 
-    /** minutes deve ser INT. */
+    // ==== PUBLIC API ==========================================================
     public void send(String toEmail, String toName, String link, int minutes) {
         try {
-            String subject = brandName + " – Confirm your account";
-            String html = buildHtml(toName, link, minutes);
+            String subject = subject();
+            String html = buildHtml(toEmail, toName, link, minutes); // readable; minify if needed
 
             MimeMessage message = mailSender.createMimeMessage();
-            // multipart=true para permitir inline image (CID)
+            // multipart=false (no inline attachments / no CID)
             MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
             try { helper.setFrom(username, brandName); } catch (Exception ignore) { helper.setFrom(username); }
-
-            // Inline logo (CID igual ao PixEmailService)
-            ClassPathResource logoRes = new ClassPathResource(logoUrl);
-            if (logoRes.exists()) {
-                helper.addInline("logoAndesCore", logoRes);
-            } else {
-                log.warn("Logo não encontrada em {}", logoUrl);
-            }
 
             mailSender.send(message);
             log.info("Account confirmation e-mail sent to {}", toEmail);
@@ -81,11 +91,81 @@ public class AccountConfirmationEmailService {
         }
     }
 
-    private String buildHtml(String name, String link, int minutes) {
-        String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
-        String title = brandName + " – Confirm your account";
-        String subtitle = "Confirm your account";
+    // ==== TEMPLATE (OCP HOOKS) ===============================================
+    /** Subject can be overridden for A/B tests without touching send(). */
+    protected String subject() { return brandName + " – Confirm your account"; }
+
+    /** Header with logo (left) + brand (right). No subtitle line. */
+    protected String headerHtml() {
+        int box = logoBox();
+        int w = logoWidth();
+        int h = logoHeight();
+        return """
+            <div style="background:linear-gradient(135deg,%s,%s);color:#ffffff;padding:16px 20px;">
+              <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+                <tr>
+                  <td style="width:%dpx;vertical-align:middle;">
+                    <div style="width:%dpx;height:%dpx;border-radius:6px;overflow:hidden;background:#0f172a;">
+                      <img src="%s" alt="%s" width="%d" height="%d"
+                           style="display:block;width:%dpx;height:%dpx;object-fit:cover;border:0;outline:0;">
+                    </div>
+                  </td>
+                  <td style="text-align:right;vertical-align:middle;white-space:nowrap;">
+                    <div style="font-weight:700;font-size:18px;line-height:1;"><strong>%s</strong></div>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            """.formatted(
+                bgHeaderStart(), bgHeaderEnd(),
+                box, box, box,
+                logoUrl, escapeHtml(brandName), w, h, w, h,
+                escapeHtml(brandName)
+        );
+    }
+
+    /** Main body using neutral colors. */
+    protected String bodyHtml(String safeName, String link, int minutes) {
+        return """
+            <div style="padding:24px;color:%s;">
+              <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
+              <p style="margin:0 0 12px;line-height:1.55">
+                Thanks for signing up to <strong>%s</strong>. Please confirm your account:
+              </p>
+              <p style="margin:20px 0">
+                <a href="%s" target="_blank" rel="noopener noreferrer"
+                   style="display:inline-block;padding:12px 18px;border-radius:8px;text-decoration:none;
+                          background:%s;color:%s;font-weight:700">
+                  Confirm my account
+                </a>
+              </p>
+              <p style="margin:0 0 12px;line-height:1.55">
+                For your security, this link expires in <strong>%d minutes</strong> and can be used only once.
+              </p>
+              <p style="font-size:12px;color:%s;margin-top:16px;word-break:break-all">
+                If the button doesn’t work, copy and paste this link into your browser:<br>%s
+              </p>
+            </div>
+            """.formatted(textPrimary(), safeName, escapeHtml(brandName), link, buttonBg(), buttonText(), minutes, textMuted(), link);
+    }
+
+    /** Compact footer to avoid Gmail trimming; bolt icon is optional. */
+    protected String footerHtml() {
         int year = Year.now().getValue();
+        return """
+            <div style="background:linear-gradient(135deg,%s,%s);color:#ffffff;
+                        padding:6px 18px;text-align:center;font-size:13px;line-height:1;">
+              <span role="img" aria-label="bolt"
+                    style="color:%s;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+              <span style="vertical-align:middle;"> © %d · Powered by <strong>Andes Core Software</strong></span>
+            </div>
+            """.formatted(bgHeaderStart(), bgHeaderEnd(), boltColor(), year);
+    }
+
+    /** Head + wrapper. */
+    protected String buildHtml(String toEmail, String name, String link, int minutes) {
+        String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
+        String title = subject();
 
         return """
             <!doctype html>
@@ -95,70 +175,26 @@ public class AccountConfirmationEmailService {
               <meta name="viewport" content="width=device-width"/>
               <title>%s</title>
             </head>
-            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
-              <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
-
-                <!-- HEADER -->
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
-                  <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
-                    <tr>
-                      <td style="width:64px;vertical-align:middle;">
-                        <img src="%s" alt="%s" width="56" style="display:block;border-radius:6px;">
-                      </td>
-                      <td style="text-align:right;vertical-align:middle;">
-                        <div style="font-weight:700;font-size:18px;line-height:1;"><strong>AndesCore Software</strong></div>
-                        <div style="height:6px;line-height:6px;font-size:0;">&nbsp;</div>
-                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">%s</div>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-
-                <!-- CONTEÚDO -->
-                <div style="padding:24px">
-                  <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
-                  <p style="margin:0 0 12px;line-height:1.55">
-                    Thanks for signing up to <strong>%s</strong>. Please confirm your account:
-                  </p>
-                  <p style="margin:20px 0">
-                    <a href="%s" target="_blank" rel="noopener noreferrer"
-                       style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
-                              background:#111827;color:#fff;font-weight:600">
-                      Confirm my account
-                    </a>
-                  </p>
-                  <p style="margin:0 0 12px;line-height:1.55">
-                    For your security, this link expires in <strong>%d minutes</strong> and can be used only once.
-                  </p>
-                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
-                    If the button doesn’t work, copy and paste this link into your browser:<br>%s
-                  </p>
-                </div>
-
-                <!-- FOOTER -->
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="raio"
-                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
-                </div>
+            <body style="font-family:Arial,Helvetica,sans-serif;background:%s;padding:24px;margin:0;">
+              <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid %s;border-radius:12px;overflow:hidden">
+                %s
+                %s
+                %s
               </div>
             </body>
             </html>
             """.formatted(
-                title,
-                subtitle,
-                safeName,
-                logoUrl,
-                brandName,
-                link,
-                minutes,
-                link,
-                year
+                escapeHtml(title),
+                pageBg(),
+                cardBorder(),
+                headerHtml(),
+                bodyHtml(safeName, link, minutes),
+                footerHtml()
         );
     }
 
-    private static String escapeHtml(String s) {
+    // ==== UTILS ===============================================================
+    protected static String escapeHtml(String s) {
         return s.replace("&","&amp;")
                 .replace("<","&lt;")
                 .replace(">","&gt;")
