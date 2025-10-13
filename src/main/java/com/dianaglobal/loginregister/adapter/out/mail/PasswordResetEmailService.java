@@ -109,12 +109,12 @@ public class PasswordResetEmailService {
                 </div>
 
                 <!-- CONTEÚDO -->
-                <div style="padding:24px">
+                <div style="padding:18px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
-                  <p style="margin:0 0 8px;line-height:1.55">
+                  <p style="margin:0 0 8px;line-height:1.4">
                     We received a request to reset your password for <strong>%s</strong>.
                   </p>
-                  <p style="margin:0 0 8px;line-height:1.55">
+                  <p style="margin:0 0 8px;line-height:1.4">
                     To continue, click the button below. The link expires in <strong>%d minutes</strong>.
                   </p>
                   <p style="margin:14px 0">
@@ -124,7 +124,7 @@ public class PasswordResetEmailService {
                       Reset my password
                     </a>
                   </p>
-                  <p style="margin:0 0 8px;line-height:1.55">
+                  <p style="margin:0 0 8px;line-height:1.4">
                     If you did not request this change, you can safely ignore this e-mail.
                   </p>
                   <p style="font-size:12px;color:#6b7280;margin-top:8px;word-break:break-all">
@@ -134,7 +134,7 @@ public class PasswordResetEmailService {
 
                 <!-- FOOTER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px; margintTop:8px;text-align:center;font-size:14px;line-height:1;">
+                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
                   <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
