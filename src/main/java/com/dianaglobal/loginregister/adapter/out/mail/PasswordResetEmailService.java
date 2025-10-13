@@ -109,7 +109,7 @@ public class PasswordResetEmailService {
                 </div>
 
                 <!-- CONTEÚDO -->
-                <div style="padding:18px">
+                <div style="padding:16px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
                   <p style="margin:0 0 8px;line-height:1.4">
                     We received a request to reset your password for <strong>%s</strong>.
@@ -134,7 +134,7 @@ public class PasswordResetEmailService {
 
                 <!-- FOOTER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                            padding:6px 16px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
                   <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
