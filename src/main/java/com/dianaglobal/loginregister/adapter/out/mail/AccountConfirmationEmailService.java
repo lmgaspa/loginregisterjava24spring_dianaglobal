@@ -92,7 +92,7 @@ public class AccountConfirmationEmailService {
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
 
-                <!-- HEADER: igual ao PixEmailService (agora com URL de imagem) -->
+                <!-- HEADER-->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
@@ -129,7 +129,7 @@ public class AccountConfirmationEmailService {
                   </p>
                 </div>
 
-                <!-- FOOTER: igual ao PixEmailService -->
+                <!-- FOOTER-->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
                             padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
