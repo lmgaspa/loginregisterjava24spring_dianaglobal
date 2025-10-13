@@ -338,14 +338,46 @@ public class AuthController {
     // ---------- Reenviar confirmação ----------
     @PostMapping(value = "/confirm/resend", consumes = "application/json", produces = "application/json")
     public ResponseEntity<MessageResponse> resendConfirmation(@Valid @RequestBody ForgotPasswordRequest req) {
+        String email = req.email().trim().toLowerCase();
+        var userOpt = userRepositoryPort.findByEmail(email);
+
+        // Se usuário já confirmou o e-mail, bloqueia novo envio
+        if (userOpt.isPresent() && userOpt.get().isEmailConfirmed()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new MessageResponse("Account already confirmed. Please log in."));
+        }
+
         try {
-            accountConfirmationService.requestConfirmation(req.email(), frontendBaseUrl);
+            accountConfirmationService.requestConfirmation(email, frontendBaseUrl);
         } catch (Exception e) {
             log.warn("[CONFIRM RESEND WARN] {}", e.getMessage());
         }
+
         return ResponseEntity.ok(new MessageResponse(
                 "If an account exists for this e-mail, we have sent a new confirmation link."
         ));
+    }
+
+    // ---------- Email está confirmado? ----------
+
+    @GetMapping(value = "/confirmed", produces = "application/json")
+    public ResponseEntity<?> isEmailConfirmed(
+            @RequestParam
+            @Email(message = "Invalid e-mail")
+            @Pattern(
+                    regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+                    message = "E-mail must contain a valid domain")
+            String email
+    ) {
+        String normalized = email.trim().toLowerCase();
+        return userRepositoryPort.findByEmail(normalized)
+                .map(user -> ResponseEntity.ok(new MessageResponse(
+                        user.isEmailConfirmed()
+                                ? "confirmed"
+                                : "not_confirmed"
+                )))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new MessageResponse("User not found")));
     }
 
     // ---------- Confirmar conta ----------
