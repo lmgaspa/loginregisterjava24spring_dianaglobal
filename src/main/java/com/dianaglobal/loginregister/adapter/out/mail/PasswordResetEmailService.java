@@ -89,11 +89,11 @@ public class PasswordResetEmailService {
               <meta name="viewport" content="width=device-width"/>
               <title>%s</title>
             </head>
-            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
+            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:22px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
 
                 <!-- HEADER -->
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:14px 18px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
                       <td style="width:64px;vertical-align:middle;">
