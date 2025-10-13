@@ -1,6 +1,7 @@
 // src/main/java/com/dianaglobal/loginregister/application/service/UserService.java
 package com.dianaglobal.loginregister.application.service;
 
+import com.dianaglobal.loginregister.application.event.UserConfirmedListener;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepositoryPort userRepository;
+    private final UserConfirmedListener userConfirmedListener; // novo
 
     /** Busca por e-mail normalizando (trim/lowercase). */
     public Optional<User> findByEmail(String email) {
@@ -41,6 +43,9 @@ public class UserService {
         if (!u.isEmailConfirmed()) {
             u.setEmailConfirmed(true);
             userRepository.save(u);
+
+            // OCP: evento externo para lidar com efeitos colaterais
+            userConfirmedListener.onUserConfirmed(u);
         }
     }
 }
