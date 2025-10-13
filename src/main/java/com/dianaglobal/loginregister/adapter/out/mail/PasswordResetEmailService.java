@@ -28,7 +28,7 @@ public class PasswordResetEmailService {
     @Value("${application.brand.name:Diana Global}")
     private String appName;
 
-    // Agora usamos URL externa para o logo (sem anexar inline/CID)
+    // Usando URL externa para o logo (sem anexar inline/CID)
     @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
     private String logoUrl;
 
@@ -66,7 +66,7 @@ public class PasswordResetEmailService {
             helper.setText(html, true);
             try { helper.setFrom(username, appName); } catch (Exception ignore) { helper.setFrom(username); }
 
-            // REMOVIDO: addInline/attachments (evita “inline/noname” no Gmail)
+            // (Sem addInline/attachments) – evita “inline/noname” no Gmail
 
             mailSender.send(message);
             log.info("Password reset e-mail sent to {}", to);
@@ -80,6 +80,8 @@ public class PasswordResetEmailService {
         String safeName = (name == null || name.isBlank()) ? "customer" : escapeHtml(name);
         int year = Year.now().getValue();
         String subtitle = "Password reset";
+        // shortId: pequena variação por envio para reduzir “…” (trim) do Gmail
+        String shortId = String.format("%06x", Math.abs((link + ":" + minutes).hashCode()) & 0xFFFFFF);
 
         return """
             <!doctype html>
@@ -89,11 +91,11 @@ public class PasswordResetEmailService {
               <meta name="viewport" content="width=device-width"/>
               <title>%s</title>
             </head>
-            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:22px">
+            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
 
-                <!-- HEADER -->
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:14px 18px;">
+                <!-- HEADER: padrão antigo (com spacer) -->
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
                       <td style="width:64px;vertical-align:middle;">
@@ -108,52 +110,53 @@ public class PasswordResetEmailService {
                   </table>
                 </div>
 
-                <!-- CONTEÚDO -->
-                <div style="padding:16px">
+                <!-- CONTEÚDO: padrão antigo -->
+                <div style="padding:24px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
-                  <p style="margin:0 0 8px;line-height:1.4">
+                  <p style="margin:0 0 12px;line-height:1.55">
                     We received a request to reset your password for <strong>%s</strong>.
                   </p>
-                  <p style="margin:0 0 8px;line-height:1.4">
+                  <p style="margin:0 0 12px;line-height:1.55">
                     To continue, click the button below. The link expires in <strong>%d minutes</strong>.
                   </p>
-                  <p style="margin:14px 0">
+                  <p style="margin:20px 0">
                     <a href="%s" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
                               background:#111827;color:#fff;font-weight:600">
                       Reset my password
                     </a>
                   </p>
-                  <p style="margin:0 0 8px;line-height:1.4">
+                  <p style="margin:0 0 12px;line-height:1.55">
                     If you did not request this change, you can safely ignore this e-mail.
                   </p>
-                  <p style="font-size:12px;color:#6b7280;margin-top:8px;word-break:break-all">
+                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
                     If the button doesn’t work, copy and paste this link into your browser:<br>%s
                   </p>
                 </div>
 
-                <!-- FOOTER -->
+                <!-- FOOTER: padrão antigo + shortId -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 16px;text-align:center;font-size:14px;line-height:1;">
+                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong> · id:%s</span>
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
-                EMAIL_TITLE,
-                logoUrl,         // <img src>
-                appName,         // alt
-                appName,         // <strong>...</strong>
-                subtitle,        // linha de subtítulo
+                EMAIL_TITLE,  // title
+                logoUrl,      // <img src>
+                appName,      // alt
+                appName,      // <strong>...</strong>
+                subtitle,     // linha de subtítulo
                 safeName,
                 appName,
                 minutes,
                 link,
                 link,
-                year
+                year,
+                shortId
         );
     }
 
