@@ -70,18 +70,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-
-        // NUNCA use "*" com allowCredentials=true. Liste os domínios.
         cfg.setAllowedOriginPatterns(List.of(
                 "https://www.dianaglobal.com.br",
                 "https://dianaglobal.com.br",
                 "http://localhost:3000" // dev
         ));
-
-        // Métodos aceitos
         cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
-
-        // Headers aceitos pelo backend (inclua Authorization e seu header de CSRF)
         cfg.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
@@ -90,13 +84,10 @@ public class SecurityConfig {
                 "X-Requested-With",
                 "Origin"
         ));
-
-        // Cookies cross-site
         cfg.setAllowCredentials(true);
 
-        // Expor headers não é necessário para Set-Cookie (o browser processa sozinho),
-        // mas pode expor Authorization se você enviar em respostas (não é o caso usual):
-        // cfg.setExposedHeaders(List.of("Authorization"));
+        // ✅ Exponha o header para o front poder lê-lo
+        cfg.setExposedHeaders(List.of("X-CSRF-Token"));
 
         cfg.setMaxAge(3600L);
 

@@ -181,6 +181,8 @@ public class AuthController {
         String csrf = csrfTokenService.generateCsrfToken(user.getEmail()); // <<< trocado
 
         setAuthCookies(response, refresh, csrf);
+        response.addHeader("X-CSRF-Token", csrf);
+        response.addHeader("Access-Control-Expose-Headers", "X-CSRF-Token");
         return ResponseEntity.ok(new LoginResponse(access, null)); // refresh não é mais retornado no body
     }
 
@@ -219,6 +221,8 @@ public class AuthController {
             String csrf = csrfTokenService.generateCsrfToken(user.getEmail()); // <<< trocado
 
             setAuthCookies(response, refresh, csrf);
+            response.addHeader("X-CSRF-Token", csrf);
+            response.addHeader("Access-Control-Expose-Headers", "X-CSRF-Token");
             return ResponseEntity.ok(new LoginResponse(access, null));
         } catch (Exception e) {
             log.error("[GOOGLE OAUTH ERROR] {}", e.getMessage(), e);
@@ -279,7 +283,6 @@ public class AuthController {
         return ResponseEntity.ok(profile);
     }
 
-    // ---------- REFRESH (lê cookies + header CSRF) ----------
     @PostMapping(value = "/refresh-token", produces = "application/json")
     public ResponseEntity<?> refresh(
             @CookieValue(name = "refresh_token", required = false) String refreshCookie,
@@ -288,25 +291,34 @@ public class AuthController {
             HttpServletResponse response
     ) {
         if (refreshCookie == null || refreshCookie.isBlank()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Missing refresh cookie"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Missing refresh cookie"));
         }
-
-        // validação CSRF: header deve bater com o cookie
+        // Double-submit CSRF
         if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageResponse("Invalid CSRF token"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Invalid CSRF token"));
         }
-
         if (!refreshTokenService.validate(refreshCookie)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid or expired refresh token"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid or expired refresh token"));
         }
 
         String email = refreshTokenService.getEmailByToken(refreshCookie);
+
+        // ✅ Rotaciona o refresh + gera novo CSRF
+        var rotated = refreshTokenService.rotate(email, refreshCookie);
+        String newCsrf = csrfTokenService.generateCsrfToken(email);
+
+        // Regrava cookies (refresh httpOnly + csrf legível)
+        setAuthCookies(response, rotated.getToken(), newCsrf);
+
+        // 🔑 expõe o novo CSRF no header para o front atualizar sua cópia
+        response.addHeader("X-CSRF-Token", newCsrf);
+        response.addHeader("Access-Control-Expose-Headers", "X-CSRF-Token");
+
+        // Access vai no body
         String newAccess = jwtService.generateToken(email);
-
-        // (Opcional) Rotacionar refresh a cada refresh:
-        // var rotated = refreshTokenService.rotate(email, refreshCookie);
-        // setAuthCookies(response, rotated.getToken(), csrfTokenService.generateCsrfToken(email));
-
         return ResponseEntity.ok(new JwtResponse(newAccess));
     }
 

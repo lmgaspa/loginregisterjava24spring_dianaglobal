@@ -4,6 +4,7 @@ import com.dianaglobal.loginregister.adapter.out.persistence.RefreshTokenReposit
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.RefreshTokenEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // <-- adicione
 
 import java.util.Date;
 import java.util.UUID;
@@ -19,7 +20,7 @@ public class RefreshTokenService {
                 .id(UUID.randomUUID())
                 .email(email)
                 .token(UUID.randomUUID().toString())
-                .expiryDate(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7))
+                .expiryDate(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)) // 7 dias
                 .revoked(false)
                 .build();
         return repository.save(token);
@@ -42,5 +43,12 @@ public class RefreshTokenService {
             t.setRevoked(true);
             repository.save(t);
         });
+    }
+
+    // ✅ NOVO: rotação simples (atômica) — NÃO quebra código existente
+    @Transactional
+    public RefreshTokenEntity rotate(String email, String oldToken) {
+        revokeToken(oldToken);
+        return create(email); // retorna RefreshTokenEntity -> já possui getToken()
     }
 }
