@@ -215,12 +215,20 @@
                     email = email.trim().toLowerCase();
                     User user = registerService.registerOauthUser(name, email, sub);
 
-                    // ✅ GARANTE que o provider fique persistido como GOOGLE
+                    // ✅ Garante que o provider seja persistido como GOOGLE
+//    e não zera o flag de quem já possui senha local
                     String provider = user.getAuthProvider();
-                    if (provider == null || !provider.equalsIgnoreCase("GOOGLE")) {
+                    if (provider == null || !"GOOGLE".equalsIgnoreCase(provider)) {
                         user.setAuthProvider("GOOGLE");
-                        userRepositoryPort.save(user); // <<-- importante persistir
                     }
+
+                    // Se o usuário NÃO tem senha armazenada, mantenha passwordSet=false.
+                    // (Se já tiver senha local, não mexa no flag.)
+                    if (user.getPassword() == null || user.getPassword().trim().isEmpty()) {
+                        user.setPasswordSet(false);
+                    }
+
+                    userRepositoryPort.save(user); // <<-- importante persistir
 
                     String access = jwtService.generateToken(user.getEmail());
                     var refreshModel = refreshTokenService.create(user.getEmail());
