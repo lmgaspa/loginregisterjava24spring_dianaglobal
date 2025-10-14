@@ -101,8 +101,8 @@ public class PasswordSetEmailService {
                 : "Password changed";
 
         String lead = firstDefinition
-                ? "Your password has been successfully created."
-                : "Your password has been successfully changed.";
+                ? "Your password has been successfully created "
+                : "Your password has been successfully changed ";
 
         String sub = firstDefinition
                 ? "From now on, you can sign in using your e-mail and this password (besides Google Login)."
