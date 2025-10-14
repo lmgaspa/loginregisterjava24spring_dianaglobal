@@ -215,9 +215,9 @@
                     email = email.trim().toLowerCase();
                     User user = registerService.registerOauthUser(name, email, sub);
 
-// ✅ garante que o provider fique persistido (trata null/"" no Java 8)
+                    // ✅ se não for GOOGLE, atualiza para GOOGLE (sem usar isBlank)
                     String provider = user.getAuthProvider();
-                    if (provider == null || provider.trim().isEmpty()) {
+                    if (provider == null || !provider.equalsIgnoreCase("GOOGLE")) {
                         user.setAuthProvider("GOOGLE");
                         userRepositoryPort.save(user);
                     }
