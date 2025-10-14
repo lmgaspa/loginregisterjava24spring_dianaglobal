@@ -215,11 +215,11 @@
                     email = email.trim().toLowerCase();
                     User user = registerService.registerOauthUser(name, email, sub);
 
-                    // ✅ se não for GOOGLE, atualiza para GOOGLE (sem usar isBlank)
+                    // ✅ GARANTE que o provider fique persistido como GOOGLE
                     String provider = user.getAuthProvider();
                     if (provider == null || !provider.equalsIgnoreCase("GOOGLE")) {
                         user.setAuthProvider("GOOGLE");
-                        userRepositoryPort.save(user);
+                        userRepositoryPort.save(user); // <<-- importante persistir
                     }
 
                     String access = jwtService.generateToken(user.getEmail());
