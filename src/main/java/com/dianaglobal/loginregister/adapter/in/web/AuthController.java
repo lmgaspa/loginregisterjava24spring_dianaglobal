@@ -264,10 +264,19 @@ public class AuthController {
                     .body(new MessageResponse("Not authenticated"));
         }
 
-        User user = userRepositoryPort.findByEmail(userDetails.getUsername())
+        var user = userRepositoryPort.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        return ResponseEntity.ok(new ProfileResponseDTO(user.getId(), user.getName(), user.getEmail()));
+        // record creation with new fields
+        var profile = new ProfileResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getAuthProvider(),   // ✅ added
+                user.isPasswordSet()      // ✅ added
+        );
+
+        return ResponseEntity.ok(profile);
     }
 
     // ---------- REFRESH (lê cookies + header CSRF) ----------
