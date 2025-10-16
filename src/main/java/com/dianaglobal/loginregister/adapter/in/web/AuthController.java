@@ -518,5 +518,4 @@ public class AuthController {
                     .body(new MessageResponse("Internal error. Code: " + id));
         }
     }
-
 }
