@@ -1,22 +1,25 @@
 // src/main/java/com/dianaglobal/loginregister/application/service/EmailChangeService.java
 package com.dianaglobal.loginregister.application.service;
 
-import com.dianaglobal.loginregister.adapter.out.mail.EmailChangeEmailService;
+import com.dianaglobal.loginregister.adapter.out.mail.EmailChangeAlertOldEmailService;
+import com.dianaglobal.loginregister.adapter.out.mail.EmailChangeChangedEmailService;
+import com.dianaglobal.loginregister.adapter.out.mail.EmailChangeConfirmNewEmailService;
 import com.dianaglobal.loginregister.adapter.out.persistence.EmailChangeTokenRepository;
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.EmailChangeTokenEntity;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -26,8 +29,15 @@ public class EmailChangeService {
 
     private final UserRepositoryPort userRepository;
     private final EmailChangeTokenRepository tokenRepo;
-    private final EmailChangeEmailService emailService;
-    private final RefreshTokenService refreshTokenService; // (se não existir, remova esta linha e o uso mais abaixo)
+
+    // Serviços de e-mail divididos em 3 arquivos
+    private final EmailChangeConfirmNewEmailService confirmNewEmailService;
+    private final EmailChangeChangedEmailService changedEmailService;
+    private final EmailChangeAlertOldEmailService alertOldEmailService;
+
+    // Opcional: pode não existir no projeto. Se presente, tentaremos revogar sessões via reflection.
+    @Autowired(required = false)
+    private RefreshTokenService refreshTokenService;
 
     @Value("${application.email-change.minutes:30}")
     private int ttlMinutes;
@@ -46,7 +56,7 @@ public class EmailChangeService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // invalida tokens antigos pendentes
+        // Invalida tokens antigos pendentes
         tokenRepo.findAllByUserIdAndValidTrue(userId).forEach(t -> {
             t.setValid(false);
             tokenRepo.save(t);
@@ -71,12 +81,16 @@ public class EmailChangeService {
         // link para o NOVO e-mail
         String link = buildConfirmLink(frontendBaseUrl, rawToken);
 
-        emailService.sendConfirmNew(newEmailNormalized, user.getName(), link, ttlMinutes);
+        // envia confirmação para o novo e-mail
+        confirmNewEmailService.sendConfirmNew(newEmailNormalized, user.getName(), link, ttlMinutes);
 
-        // opcional: alerta para o antigo
+        // opcional: alerta para o e-mail antigo
         try {
             if (user.getEmail() != null && !user.getEmail().isBlank()) {
-                emailService.sendAlertOld(user.getEmail(), user.getName(), frontendBaseUrl + "/support");
+                String support = (frontendBaseUrl == null || frontendBaseUrl.isBlank())
+                        ? "https://www.dianaglobal.com.br/support"
+                        : (frontendBaseUrl.endsWith("/") ? frontendBaseUrl + "support" : frontendBaseUrl + "/support");
+                alertOldEmailService.sendAlertOld(user.getEmail(), user.getName(), support);
             }
         } catch (Exception ex) {
             log.warn("[EMAIL-CHANGE] alert-old send warn: {}", ex.getMessage());
@@ -119,17 +133,48 @@ public class EmailChangeService {
             tokenRepo.save(other);
         });
 
-        // Se você tiver mesmo um método para revogar todas as sessões do e-mail antigo, use aqui.
-        // Exemplo (AJUSTE ao seu RefreshTokenService real):
-        // try { if (oldEmail != null) refreshTokenService.revokeAllFor(oldEmail); } catch (Exception ignore) {}
+        // Revoga sessões do e-mail antigo, se o serviço existir e expuser algum método compatível.
+        tryRevokeAllSessions(oldEmail);
 
         try {
-            emailService.sendChanged(newEmail, user.getName());
+            changedEmailService.sendChanged(newEmail, user.getName());
         } catch (Exception ex) {
             log.warn("[EMAIL-CHANGE] changed-mail warn: {}", ex.getMessage());
         }
 
         log.info("[EMAIL-CHANGE] user {} changed e-mail {} -> {}", userId, oldEmail, newEmail);
+    }
+
+    private void tryRevokeAllSessions(String oldEmail) {
+        if (refreshTokenService == null || oldEmail == null || oldEmail.isBlank()) return;
+        try {
+            // Tentativas de métodos comuns via reflection (sem quebrar o build se não existir)
+            Method m;
+            try {
+                m = refreshTokenService.getClass().getMethod("revokeAllFor", String.class);
+                m.invoke(refreshTokenService, oldEmail);
+                log.info("[EMAIL-CHANGE] revoked all sessions for {}", oldEmail);
+                return;
+            } catch (NoSuchMethodException ignore) {}
+
+            try {
+                m = refreshTokenService.getClass().getMethod("revokeAllForEmail", String.class);
+                m.invoke(refreshTokenService, oldEmail);
+                log.info("[EMAIL-CHANGE] revoked all sessions for {}", oldEmail);
+                return;
+            } catch (NoSuchMethodException ignore) {}
+
+            try {
+                m = refreshTokenService.getClass().getMethod("revokeAll", String.class);
+                m.invoke(refreshTokenService, oldEmail);
+                log.info("[EMAIL-CHANGE] revoked all sessions for {}", oldEmail);
+                return;
+            } catch (NoSuchMethodException ignore) {}
+
+            log.debug("[EMAIL-CHANGE] RefreshTokenService has no revokeAll* method; skipping session revocation");
+        } catch (Exception e) {
+            log.warn("[EMAIL-CHANGE] revoke sessions warn: {}", e.getMessage());
+        }
     }
 
     private static String buildConfirmLink(String frontendBaseUrl, String token) {
