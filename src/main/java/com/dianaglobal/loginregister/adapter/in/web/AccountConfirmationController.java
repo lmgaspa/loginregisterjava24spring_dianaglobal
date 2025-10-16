@@ -43,4 +43,12 @@ public class AccountConfirmationController {
 
             @NotBlank String frontendBaseUrl
     ) {}
+
+    @PostMapping(value = "/resend", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<?> resend(@RequestBody @Valid ConfirmationRequest body) {
+        // Anti-enumeração: sempre 200 com shape consistente
+        var now = java.time.Instant.now();
+            var result = service.resendWithThrottle(body.email(), body.frontendBaseUrl(), now);
+        return ResponseEntity.status(result.httpStatus()).body(result.body());
+    }
 }

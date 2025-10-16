@@ -12,9 +12,11 @@ import com.dianaglobal.loginregister.application.service.AccountConfirmationServ
 import com.dianaglobal.loginregister.application.service.JwtService;
 import com.dianaglobal.loginregister.application.service.RefreshTokenService;
 import com.dianaglobal.loginregister.application.service.UserService;
+import com.dianaglobal.loginregister.application.service.ConfirmationResendThrottleService;
+import com.dianaglobal.loginregister.adapter.in.dto.ApiError;
+import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
 import com.dianaglobal.loginregister.domain.model.User;
 import com.dianaglobal.loginregister.security.CsrfTokenService;
-import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,6 +41,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -48,18 +51,18 @@ import java.util.UUID;
 @Validated
 public class AuthController {
 
-    // ======== Constantes (evita duplicação de strings / facilita extensão) ========
+    // ======== Constantes ========
     private static final String HDR_SET_COOKIE = HttpHeaders.SET_COOKIE;
     private static final String HDR_EXPOSE = "Access-Control-Expose-Headers";
     private static final String HDR_CSRF = "X-CSRF-Token";
     private static final String CT_JSON = "application/json";
     private static final String COOKIE_REFRESH = "refresh_token";
     private static final String COOKIE_CSRF = "csrf_token";
-    private static final String COOKIE_PATH = "/api/auth"; // manter consistente no set e clear
+    private static final String COOKIE_PATH = "/api/auth";
     private static final String SAME_SITE_NONE = "None";
     private static final String SAME_SITE_LAX = "Lax";
 
-    // ======== Casos de uso / serviços (pontos de extensão) ========
+    // ======== Serviços ========
     private final RegisterUserUseCase registerService;
     private final AccountConfirmationService accountConfirmationService;
     private final UserService userService;
@@ -68,9 +71,8 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final CsrfTokenService csrfTokenService;
-
-    // E-mail de notificação de criação/alteração de senha
     private final PasswordSetEmailService passwordSetEmailService;
+    private final ConfirmationResendThrottleService confirmationResendThrottleService;
 
     @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
@@ -78,7 +80,6 @@ public class AuthController {
     @Value("${application.cookies.secure:true}")
     private boolean cookiesSecure;
 
-    // duração típica de refresh (ex.: 30 dias)
     @Value("${application.auth.refresh-ttl-days:30}")
     private long refreshTtlDays;
 
@@ -87,7 +88,7 @@ public class AuthController {
     @Autowired(required = false)
     private GoogleIdTokenVerifier googleTokenVerifier;
 
-    // ===================== Helpers de cookie/headers (OCP-friendly) =====================
+    // ===================== Helpers de cookie/headers =====================
     private ResponseCookie buildRefreshCookie(String token, long maxAgeSeconds, String sameSite) {
         return ResponseCookie.from(COOKIE_REFRESH, token == null ? "" : token)
                 .httpOnly(true)
@@ -100,17 +101,18 @@ public class AuthController {
 
     private ResponseCookie buildCsrfCookie(String token, long maxAgeSeconds, String sameSite) {
         return ResponseCookie.from(COOKIE_CSRF, token == null ? "" : token)
-                .httpOnly(false) // legível pelo front para mandar em X-CSRF-Token
+                .httpOnly(false)
                 .secure(cookiesSecure)
                 .sameSite(sameSite)
-                .path(COOKIE_PATH) // manter igual ao set
+                .path(COOKIE_PATH)
                 .maxAge(maxAgeSeconds)
                 .build();
     }
 
     private void setAuthCookies(HttpServletResponse response, String refresh, String csrf) {
-        ResponseCookie refreshCookie = buildRefreshCookie(refresh, Duration.ofDays(refreshTtlDays).getSeconds(), SAME_SITE_NONE);
-        ResponseCookie csrfCookie    = buildCsrfCookie(csrf, Duration.ofDays(refreshTtlDays).getSeconds(), SAME_SITE_NONE);
+        long maxAge = Duration.ofDays(refreshTtlDays).getSeconds();
+        ResponseCookie refreshCookie = buildRefreshCookie(refresh, maxAge, SAME_SITE_NONE);
+        ResponseCookie csrfCookie    = buildCsrfCookie(csrf, maxAge, SAME_SITE_NONE);
         response.addHeader(HDR_SET_COOKIE, refreshCookie.toString());
         response.addHeader(HDR_SET_COOKIE, csrfCookie.toString());
     }
@@ -129,7 +131,9 @@ public class AuthController {
 
     // ===================== REGISTER =====================
     @PostMapping(value = "/register", consumes = CT_JSON, produces = CT_JSON)
-    public ResponseEntity<MessageResponse> register(@RequestBody @Valid com.dianaglobal.loginregister.adapter.in.dto.password.RegisterRequest request) {
+    public ResponseEntity<MessageResponse> register(
+            @RequestBody @Valid com.dianaglobal.loginregister.adapter.in.dto.password.RegisterRequest request) {
+
         final String name = request.name() == null ? null : request.name().trim();
         final String email = request.email().trim().toLowerCase();
         final String password = request.password();
@@ -167,32 +171,39 @@ public class AuthController {
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid credentials"));
         }
-
         User user = userOpt.get();
 
         if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new MessageResponse("Use Sign in with Google or set a password first."));
         }
-
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid credentials"));
         }
 
+        // >>> NOVO: e-mail não confirmado => erro tipado + metadados de cooldown
         if (!user.isEmailConfirmed()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Please confirm your e-mail to sign in"));
+            var info = confirmationResendThrottleService.preview(user.getId(), Instant.now());
+            var body = ApiError.builder()
+                    .error("EMAIL_UNCONFIRMED")
+                    .message("Email não confirmado.")
+                    .canResend(info.canResend())
+                    .cooldownSecondsRemaining(info.cooldownSecondsRemaining())
+                    .attemptsToday(info.attemptsToday())
+                    .maxPerDay(info.maxPerDay())
+                    .nextAllowedAt(info.nextAllowedAt())
+                    .build();
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body); // 409
         }
 
         String access = jwtService.generateToken(user.getEmail());
-        var refreshModel = refreshTokenService.create(user.getEmail()); // persiste/rotaciona no servidor
+        var refreshModel = refreshTokenService.create(user.getEmail());
         String refresh = refreshModel.getToken();
         String csrf = csrfTokenService.generateCsrfToken(user.getEmail());
 
         setAuthCookies(response, refresh, csrf);
         exposeCsrfHeader(response, csrf);
 
-        // refresh não é mais retornado no body
         return ResponseEntity.ok(new LoginResponse(access, null));
     }
 
@@ -225,7 +236,7 @@ public class AuthController {
             email = email.trim().toLowerCase();
             User user = registerService.registerOauthUser(name, email, sub);
 
-            // ✅ Garante que o provider seja persistido como GOOGLE sem zerar flags de senha local
+            // Garante provider/flags
             String provider = user.getAuthProvider();
             if (provider == null || !"GOOGLE".equalsIgnoreCase(provider)) {
                 user.setAuthProvider("GOOGLE");
@@ -233,7 +244,7 @@ public class AuthController {
             if (user.getPassword() == null || user.getPassword().trim().isEmpty()) {
                 user.setPasswordSet(false);
             }
-            userRepositoryPort.save(user); // persistir mudanças
+            userRepositoryPort.save(user);
 
             String access = jwtService.generateToken(user.getEmail());
             var refreshModel = refreshTokenService.create(user.getEmail());
@@ -279,7 +290,6 @@ public class AuthController {
         user.setPasswordSet(true);
         userRepositoryPort.save(user);
 
-        // Notificações de e-mail são “extensões” plugáveis (não quebram a rota se falhar)
         try {
             if (!wasPasswordSetBefore) {
                 passwordSetEmailService.sendFirstDefinition(user.getEmail(), user.getName());
@@ -315,7 +325,7 @@ public class AuthController {
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                provider,           // nunca null
+                provider,
                 user.isPasswordSet()
         );
 
@@ -334,7 +344,6 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Missing refresh cookie"));
         }
-        // Double-submit CSRF
         if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new MessageResponse("Invalid CSRF token"));
@@ -345,16 +354,12 @@ public class AuthController {
         }
 
         String email = refreshTokenService.getEmailByToken(refreshCookie);
-
-        // ✅ Rotaciona o refresh + gera novo CSRF
         var rotated = refreshTokenService.rotate(email, refreshCookie);
         String newCsrf = csrfTokenService.generateCsrfToken(email);
 
-        // Regrava cookies (refresh httpOnly + csrf legível)
         setAuthCookies(response, rotated.getToken(), newCsrf);
         exposeCsrfHeader(response, newCsrf);
 
-        // Access vai no body
         String newAccess = jwtService.generateToken(email);
         return ResponseEntity.ok(new JwtResponse(newAccess));
     }
@@ -399,7 +404,6 @@ public class AuthController {
         String email = req.email().trim().toLowerCase();
         var userOpt = userRepositoryPort.findByEmail(email);
 
-        // Se usuário já confirmou o e-mail, bloqueia novo envio
         if (userOpt.isPresent() && userOpt.get().isEmailConfirmed()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new MessageResponse("Account already confirmed. Please log in."));
@@ -429,9 +433,7 @@ public class AuthController {
         String normalized = email.trim().toLowerCase();
         return userRepositoryPort.findByEmail(normalized)
                 .map(user -> ResponseEntity.ok(new MessageResponse(
-                        user.isEmailConfirmed()
-                                ? "confirmed"
-                                : "not_confirmed"
+                        user.isEmailConfirmed() ? "confirmed" : "not_confirmed"
                 )))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new MessageResponse("User not found")));

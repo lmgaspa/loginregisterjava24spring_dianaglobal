@@ -1,44 +1,37 @@
-// src/main/java/.../config/TtlIndexRepair.java
 package com.dianaglobal.loginregister.config;
 
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.AccountConfirmationTokenEntity;
-import com.dianaglobal.loginregister.adapter.out.persistence.entity.PasswordResetTokenEntity;
-import lombok.RequiredArgsConstructor;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
+import com.dianaglobal.loginregister.adapter.out.persistence.entity.ConfirmResendThrottleEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
-import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 
-@Component
-@RequiredArgsConstructor
-public class TtlIndexRepair implements ApplicationRunner {
+@Configuration
+public class TtlIndexRepair {
 
-    private final MongoTemplate mongo;
+    private static final Logger log = LoggerFactory.getLogger(TtlIndexRepair.class);
+    private final MongoTemplate mongoTemplate;
 
-    @Override
-    public void run(ApplicationArguments args) {
-        // password_reset_tokens
-        var prOps = mongo.indexOps(PasswordResetTokenEntity.class);
-        prOps.getIndexInfo().stream()
-                .filter(i -> "expiresAt".equals(i.getName()))
-                .findFirst()
-                .ifPresent(i -> prOps.dropIndex("expiresAt"));
-        prOps.ensureIndex(new Index().on("expiresAt", Sort.Direction.ASC)
-                .named("password_reset_expires_ttl")
-                .expire(Duration.ZERO));
+    public TtlIndexRepair(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
 
-        // account_confirmation_tokens (se existir)
-        var acOps = mongo.indexOps(AccountConfirmationTokenEntity.class);
-        acOps.getIndexInfo().stream()
-                .filter(i -> "expiresAt".equals(i.getName()))
-                .findFirst()
-                .ifPresent(i -> acOps.dropIndex("expiresAt"));
-        acOps.ensureIndex(new Index().on("expiresAt", Sort.Direction.ASC)
-                .named("account_confirm_expires_ttl")
-                .expire(Duration.ZERO));
+    @PostConstruct
+    public void ensureTtlIndexes() {
+        // TTL diário para throttle: expira createdAt + 1 dia
+        mongoTemplate.indexOps(ConfirmResendThrottleEntity.class)
+                .ensureIndex(new Index().on("createdAt", Sort.Direction.ASC).expire(Duration.ofDays(1)));
+
+        // TTL exato para tokens: expira exatamente em expiresAt
+        mongoTemplate.indexOps(AccountConfirmationTokenEntity.class)
+                .ensureIndex(new Index().on("expiresAt", Sort.Direction.ASC).expire(Duration.ZERO));
+
+        log.info("[TTL] TTL indexes ensured for throttle and confirmation tokens");
     }
 }
