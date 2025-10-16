@@ -48,7 +48,7 @@ public class EmailChangeConfirmNewEmailService {
     private String buildHtml(String name, String confirmLink, int minutes, String pageTitle) {
         final String brand = branding.brandName();
         final String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
-        final String safeLogo = branding.safeLogoUrl();
+        final String safeLogo = normalizeLogoUrl(branding.safeLogoUrl());
         final int year = Year.now().getValue();
 
         return """
@@ -104,7 +104,7 @@ public class EmailChangeConfirmNewEmailService {
                     <td style="padding:16px 20px;">
                       <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0">
                         <tr>
-                          <td width="64" valign="middle" style="padding:0;margin:0;">
+                          <td width="72" valign="middle" style="padding:0;margin:0;">
                             %s
                           </td>
                           <td align="right" valign="middle" style="padding:0;margin:0;">
@@ -120,20 +120,30 @@ public class EmailChangeConfirmNewEmailService {
               </td>
             </tr>
             """.formatted(
-                imgBoiler(logoUrl, brand, 56, 56, true),
+                imgBoiler(logoUrl, brand, 64, 64, true), // 64x64 para presença visual e sizing fixo
                 escapeHtml(brand),
                 escapeHtml(subtitle)
         );
     }
 
+    /** Footer centralizado com mini-tabela para evitar desalinhamento do emoji. */
     private String footer(int year) {
         return """
             <tr>
-              <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;">
-                <span role="img" aria-label="lightning" style="font-size:20px;vertical-align:middle;">&#9889;&#65039;</span>
-                <span style="vertical-align:middle;font-size:13px;line-height:1.4;">
-                  &nbsp;© %d · Powered by <strong>AndesCore Software</strong>&#8203;
-                </span>
+              <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);color:#ffffff;">
+                <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+                  <tr>
+                    <td valign="middle" style="padding-right:8px;">
+                      <span role="img" aria-label="lightning"
+                            style="display:inline-block;font-size:20px;line-height:1;vertical-align:middle;">&#9889;&#65039;</span>
+                    </td>
+                    <td valign="middle" style="text-align:center;">
+                      <span style="display:inline-block;vertical-align:middle;font-size:13px;line-height:1.4;">
+                        © %d · Powered by <strong>AndesCore Software</strong>&#8203;
+                      </span>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             """.formatted(year);
@@ -156,15 +166,26 @@ public class EmailChangeConfirmNewEmailService {
     }
 
     private String imgBoiler(String url, String alt, int width, int height, boolean rounded) {
+        final String src = escapeHtml(url);
         final String radius = rounded ? "6px" : "0";
         return """
             <img src="%s" alt="%s" width="%d" height="%d"
                  style="display:block;outline:none;border:none;text-decoration:none;-ms-interpolation-mode:bicubic;
                         width:%dpx;height:%dpx;border-radius:%s;">
             """.formatted(
-                escapeHtml(url), escapeHtml(alt),
+                src, escapeHtml(alt),
                 width, height, width, height, radius
         );
+    }
+
+    /** Garante URL absoluta e HTTPS para reduzir bloqueio por clientes de e-mail. */
+    private static String normalizeLogoUrl(String url) {
+        if (url == null) return "";
+        String u = url.trim();
+        if (u.isEmpty()) return "";
+        if (u.startsWith("//")) return "https:" + u;
+        if (u.startsWith("http://")) return "https://" + u.substring(7);
+        return u;
     }
 
     private static String escapeHtml(String s) {
