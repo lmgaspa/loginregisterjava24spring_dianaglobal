@@ -1,15 +1,17 @@
+// src/main/java/com/dianaglobal/loginregister/application/service/JwtService.java
 package com.dianaglobal.loginregister.application.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.time.Duration;
 import java.util.Date;
 import java.util.function.Function;
 
@@ -17,17 +19,22 @@ import java.util.function.Function;
 public class JwtService {
 
     @Value("${application.jwt.secret}")
-    private String secretKeyRaw;
+    private String secretKeyRawBase64;
+
+    @Value("${application.jwt.access-ttl:PT15M}")
+    private Duration accessTtl;
 
     public String extractEmail(String token) {
         return extractClaim(token, Claims::getSubject);
     }
 
-    public String generateToken(String email) {
+    /** Access Token (curto) */
+    public String generateAccessToken(String email) {
+        long now = System.currentTimeMillis();
         return Jwts.builder()
                 .setSubject(email)
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)) // 7 dias
+                .setIssuedAt(new Date(now))
+                .setExpiration(new Date(now + accessTtl.toMillis()))
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -46,20 +53,18 @@ public class JwtService {
     }
 
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    private Claims extractAllClaims(String token) {
-        return Jwts
+        final Claims claims = Jwts
                 .parserBuilder()
                 .setSigningKey(getSignKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+        return claimsResolver.apply(claims);
     }
 
     private Key getSignKey() {
-        return Keys.hmacShaKeyFor(secretKeyRaw.getBytes());
+        // JWT_SECRET deve ser Base64; ex.: 64+ bytes codificados
+        byte[] keyBytes = Decoders.BASE64.decode(secretKeyRawBase64);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

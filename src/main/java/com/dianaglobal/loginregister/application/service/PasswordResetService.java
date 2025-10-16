@@ -7,6 +7,7 @@ import com.dianaglobal.loginregister.adapter.out.persistence.entity.PasswordRese
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,9 @@ public class PasswordResetService {
     private final PasswordResetEmailService emailService;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${application.frontend.auth.reset-ttl-minutes:30}")
+    private int resetMinutes;
+
     /** Create a reset link: random token, store only SHA-256 hash, send e-mail. */
     public void requestReset(String email, String frontendBaseUrl) {
         final String normalized = email == null ? "" : email.trim().toLowerCase();
@@ -45,7 +49,7 @@ public class PasswordResetService {
         String tokenPlain = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
         String tokenHash  = sha256Url(raw);
 
-        Instant expires = Instant.now().plusSeconds(45 * 60);
+        Instant expires = Instant.now().plusSeconds(resetMinutes * 60L);
 
         PasswordResetTokenEntity entity = PasswordResetTokenEntity.builder()
                 .id(UUID.randomUUID())
@@ -57,8 +61,8 @@ public class PasswordResetService {
 
         tokenRepo.save(entity);
 
-        String link = frontendBaseUrl + "/reset-password?token=" + tokenPlain;
-        emailService.sendPasswordReset(user.getEmail(), user.getName(), link, 45);
+        String link = buildResetLink(frontendBaseUrl, tokenPlain);
+        emailService.sendPasswordReset(user.getEmail(), user.getName(), link, resetMinutes);
     }
 
     /** Validate token and actually update the password (BCrypt). Token becomes single-use. */
@@ -84,6 +88,17 @@ public class PasswordResetService {
         tokenRepo.save(entity);
         // Alternatively: tokenRepo.deleteById(entity.getId());
     }
+
+    private static String buildResetLink(String frontendBaseUrl, String token) {
+               String base = (frontendBaseUrl == null || frontendBaseUrl.isBlank())
+                               ? "https://www.dianaglobal.com.br"
+                               : frontendBaseUrl.trim();
+               if (base.endsWith("/")) {
+                       base = base.substring(0, base.length() - 1);
+                  }
+               // token é Base64 URL-safe; não precisa encode extra
+                       return base + "/reset-password?token=" + token;
+           }
 
     // --- helpers ---
 

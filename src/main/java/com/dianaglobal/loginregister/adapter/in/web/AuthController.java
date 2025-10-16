@@ -1,6 +1,6 @@
 package com.dianaglobal.loginregister.adapter.in.web;
 
-import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.AccessResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.OAuthGoogleRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.ProfileResponseDTO;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
@@ -78,9 +78,9 @@ public class AuthController {
     @Value("${application.cookies.secure:true}")
     private boolean cookiesSecure;
 
-    // duração típica de refresh (ex.: 30 dias)
-    @Value("${application.auth.refresh-ttl-days:30}")
-    private long refreshTtlDays;
+    // usa a mesma duration do back (ex.: PT7D)
+    @Value("${application.jwt.refresh-ttl:PT7D}")
+    private Duration refreshTtl;
 
     public record MessageResponse(String message) {}
 
@@ -109,8 +109,9 @@ public class AuthController {
     }
 
     private void setAuthCookies(HttpServletResponse response, String refresh, String csrf) {
-        ResponseCookie refreshCookie = buildRefreshCookie(refresh, Duration.ofDays(refreshTtlDays).getSeconds(), SAME_SITE_NONE);
-        ResponseCookie csrfCookie    = buildCsrfCookie(csrf, Duration.ofDays(refreshTtlDays).getSeconds(), SAME_SITE_NONE);
+        long maxAge = refreshTtl.getSeconds();
+        ResponseCookie refreshCookie = buildRefreshCookie(refresh, maxAge, SAME_SITE_NONE);
+        ResponseCookie csrfCookie    = buildCsrfCookie(csrf,    maxAge, SAME_SITE_NONE);
         response.addHeader(HDR_SET_COOKIE, refreshCookie.toString());
         response.addHeader(HDR_SET_COOKIE, csrfCookie.toString());
     }
@@ -184,7 +185,7 @@ public class AuthController {
                     .body(new MessageResponse("Please confirm your e-mail to sign in"));
         }
 
-        String access = jwtService.generateToken(user.getEmail());
+        String access = jwtService.generateAccessToken(user.getEmail());
         var refreshModel = refreshTokenService.create(user.getEmail()); // persiste/rotaciona no servidor
         String refresh = refreshModel.getToken();
         String csrf = csrfTokenService.generateCsrfToken(user.getEmail());
@@ -235,7 +236,7 @@ public class AuthController {
             }
             userRepositoryPort.save(user); // persistir mudanças
 
-            String access = jwtService.generateToken(user.getEmail());
+            String access = jwtService.generateAccessToken(user.getEmail());
             var refreshModel = refreshTokenService.create(user.getEmail());
             String refresh = refreshModel.getToken();
             String csrf = csrfTokenService.generateCsrfToken(user.getEmail());
@@ -354,9 +355,9 @@ public class AuthController {
         setAuthCookies(response, rotated.getToken(), newCsrf);
         exposeCsrfHeader(response, newCsrf);
 
-        // Access vai no body
-        String newAccess = jwtService.generateToken(email);
-        return ResponseEntity.ok(new JwtResponse(newAccess));
+        // depois (idêntico ao “antes” se você já trocou o DTO)
+        String newAccess = jwtService.generateAccessToken(email);
+        return ResponseEntity.ok(new AccessResponse(newAccess));
     }
 
     // ===================== FIND USER =====================

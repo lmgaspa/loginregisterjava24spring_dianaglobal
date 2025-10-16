@@ -7,6 +7,7 @@ import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,11 +29,12 @@ public class AccountConfirmationService {
     /** Responsible for sending the confirmation e-mail. */
     private final AccountConfirmationEmailService emailService;
 
-    // NEW — Listener extension point (OCP-friendly)
-    private final UserConfirmedListener userConfirmedListener;
+    // torna opcional para não derrubar o app se não houver bean
+    @Autowired(required = false)
+    private UserConfirmedListener userConfirmedListener;
 
     /** Confirmation token validity in minutes. */
-    @Value("${application.confirmation.minutes:45}")
+    @Value("${application.frontend.auth.confirmation-ttl-minutes:60}")
     private int expirationMinutes;
 
     /** Sends a new confirmation email if user exists. */
@@ -96,7 +98,9 @@ public class AccountConfirmationService {
         // NEW — Fire event to OCP listener (WelcomeEmailOnConfirm)
         userRepository.findById(userId).ifPresent(user -> {
             try {
-                userConfirmedListener.onUserConfirmed(user);
+                if (userConfirmedListener != null) {
+                    userConfirmedListener.onUserConfirmed(user);
+                }
             } catch (Exception e) {
                 log.warn("[CONFIRMATION] welcome e-mail failed for {}: {}", user.getEmail(), e.getMessage());
             }

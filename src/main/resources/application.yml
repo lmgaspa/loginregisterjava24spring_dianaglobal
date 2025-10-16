@@ -1,22 +1,11 @@
 spring:
   application:
     name: ${APPLICATION_NAME}
-
-    google:
-      oauth:
-        enabled: ${GOOGLE_OAUTH_ENABLED:false}  # defina true no Heroku quando quiser ativar
-    # GOOGLE_CLIENT_ID vem do ambiente (sem default aqui de propósito)
-
   data:
     mongodb:
       uri: ${MONGODB_URI}
       auto-index-creation: true
       uuid-representation: standard
-  # logging opcional
-  logging:
-    level:
-      org.springframework.data.mongodb: info
-
   mail:
     host: ${MAIL_HOST}
     port: ${MAIL_PORT}
@@ -29,13 +18,27 @@ spring:
           starttls:
             enable: true
 
+logging:
+  level:
+    org.springframework.data.mongodb: info
+
 application:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET}                 # base64url seguro (>= 256 bits) se usar HS256
+    access-ttl: ${JWT_ACCESS_TTL:PT15M}   # 15 min
+    refresh-ttl: ${JWT_REFRESH_TTL:PT7D}  # 7 dias
   brand:
     name: ${BRAND_NAME}
   frontend:
     base-url: ${FRONTEND_BASE_URL}
+  auth:
+    confirmation-ttl-minutes: 60          # link de confirmar e-mail
+    reset-ttl-minutes: 30                 # link de reset de senha
+
+  application:
+   google:
+    oauth:
+      enabled: ${GOOGLE_OAUTH_ENABLED:false}
 
 springdoc:
   api-docs:

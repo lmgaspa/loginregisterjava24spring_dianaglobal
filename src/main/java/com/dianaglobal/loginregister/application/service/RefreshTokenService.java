@@ -3,9 +3,11 @@ package com.dianaglobal.loginregister.application.service;
 import com.dianaglobal.loginregister.adapter.out.persistence.RefreshTokenRepository;
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.RefreshTokenEntity;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // <-- adicione
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.Date;
 import java.util.UUID;
 
@@ -15,12 +17,15 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository repository;
 
+    @Value("${application.jwt.refresh-ttl:PT7D}")
+    private Duration refreshTtl;
+
     public RefreshTokenEntity create(String email) {
         RefreshTokenEntity token = RefreshTokenEntity.builder()
                 .id(UUID.randomUUID())
                 .email(email)
                 .token(UUID.randomUUID().toString())
-                .expiryDate(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)) // 7 dias
+                .expiryDate(new Date(System.currentTimeMillis() + refreshTtl.toMillis()))
                 .revoked(false)
                 .build();
         return repository.save(token);
