@@ -1,72 +1,39 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/PasswordResetEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import jakarta.annotation.PostConstruct;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
 import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
-import java.util.Properties;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class PasswordResetEmailService {
 
-    @Value("${mail.host}") private String host;
-    @Value("${mail.port}") private int port;
-    @Value("${mail.username}") private String username;
-    @Value("${mail.password}") private String password;
-    @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
-    @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
+    private final JavaMailSender mailSender;
+    private final MailBranding branding;
 
-    @Value("${application.brand.name:Diana Global}")
-    private String appName;
-
-    // Usando URL externa para o logo (sem anexar inline/CID)
-    @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
-    private String logoUrl;
-
-    private JavaMailSender mailSender;
-
-    private static final String EMAIL_TITLE = "Diana Global – Password Reset";
-
-    @PostConstruct
-    void init() {
-        JavaMailSenderImpl impl = new JavaMailSenderImpl();
-        impl.setHost(host);
-        impl.setPort(port);
-        impl.setUsername(username);
-        impl.setPassword(password);
-        impl.setDefaultEncoding(StandardCharsets.UTF_8.name());
-
-        Properties props = impl.getJavaMailProperties();
-        props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
-        props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        this.mailSender = impl;
-
-        log.info("PasswordResetEmailService initialized with host={} port={}", host, port);
-    }
+    @Value("${mail.username}") private String fromAddress;
 
     public void sendPasswordReset(String to, String name, String link, int minutes) {
         try {
-            String subject = EMAIL_TITLE;
+            String subject = branding.brandName() + " – Password Reset";
             String html = buildHtml(name, link, minutes);
 
             MimeMessage message = mailSender.createMimeMessage();
-            // multipart=false (não anexamos imagem inline/CID)
             MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
-            try { helper.setFrom(username, appName); } catch (Exception ignore) { helper.setFrom(username); }
-
-            // (Sem addInline/attachments) – evita “inline/noname” no Gmail
+            try { helper.setFrom(fromAddress, branding.brandName()); } catch (Exception ignore) { helper.setFrom(fromAddress); }
 
             mailSender.send(message);
             log.info("Password reset e-mail sent to {}", to);
@@ -80,8 +47,8 @@ public class PasswordResetEmailService {
         String safeName = (name == null || name.isBlank()) ? "customer" : escapeHtml(name);
         int year = Year.now().getValue();
         String subtitle = "Password reset";
-        // shortId: pequena variação por envio para reduzir “…” (trim) do Gmail
         String shortId = String.format("%06x", Math.abs((link + ":" + minutes).hashCode()) & 0xFFFFFF);
+        String logoUrl = branding.safeLogoUrl();
 
         return """
             <!doctype html>
@@ -89,12 +56,10 @@ public class PasswordResetEmailService {
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
-              <title>%s</title>
+              <title>%s – Password Reset</title>
             </head>
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
-
-                <!-- HEADER: padrão antigo (com spacer) -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
@@ -109,8 +74,6 @@ public class PasswordResetEmailService {
                     </tr>
                   </table>
                 </div>
-
-                <!-- CONTEÚDO: padrão antigo -->
                 <div style="padding:24px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
                   <p style="margin:0 0 12px;line-height:1.55">
@@ -121,8 +84,7 @@ public class PasswordResetEmailService {
                   </p>
                   <p style="margin:20px 0">
                     <a href="%s" target="_blank" rel="noopener noreferrer"
-                       style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
-                              background:#111827;color:#fff;font-weight:600">
+                       style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;background:#111827;color:#fff;font-weight:600">
                       Reset my password
                     </a>
                   </p>
@@ -133,25 +95,21 @@ public class PasswordResetEmailService {
                     If the button doesn’t work, copy and paste this link into your browser:<br>%s
                   </p>
                 </div>
-
-                <!-- FOOTER: padrão antigo + shortId -->
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="raio"
-                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="raio" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
                   <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong> · id:%s</span>
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
-                EMAIL_TITLE,  // title
-                logoUrl,      // <img src>
-                appName,      // alt
-                appName,      // <strong>...</strong>
-                subtitle,     // linha de subtítulo
+                branding.brandName(), // title
+                logoUrl,              // img src
+                branding.brandName(), // alt
+                branding.brandName(), // brand text
+                subtitle,             // subtitle line
                 safeName,
-                appName,
+                branding.brandName(),
                 minutes,
                 link,
                 link,
@@ -161,10 +119,7 @@ public class PasswordResetEmailService {
     }
 
     private static String escapeHtml(String s) {
-        return s.replace("&","&amp;")
-                .replace("<","&lt;")
-                .replace(">","&gt;")
-                .replace("\"","&quot;")
-                .replace("'","&#x27;");
+        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                .replace("\"","&quot;").replace("'","&#x27;");
     }
 }

@@ -1,58 +1,29 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/out/mail/EmailChangeEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import jakarta.annotation.PostConstruct;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
 import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
-import java.util.Properties;
 
 @Component
+@RequiredArgsConstructor
 public class EmailChangeEmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailChangeEmailService.class);
 
-    @Value("${mail.host}") private String host;
-    @Value("${mail.port}") private int port;
-    @Value("${mail.username}") private String username;
-    @Value("${mail.password}") private String password;
-    @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
-    @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
+    private final JavaMailSender mailSender;
+    private final MailBranding branding;
 
-    @Value("${application.brand.name:Diana Global}")
-    private String brandName;
-
-    @Value("${application.frontend.url:https://www.dianaglobal.com.br}")
-    private String frontendBaseUrl;
-
-    @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
-    private String logoUrl;
-
-    private JavaMailSender mailSender;
-
-    @PostConstruct
-    void init() {
-        JavaMailSenderImpl impl = new JavaMailSenderImpl();
-        impl.setHost(host);
-        impl.setPort(port);
-        impl.setUsername(username);
-        impl.setPassword(password);
-        impl.setDefaultEncoding(StandardCharsets.UTF_8.name());
-
-        Properties props = impl.getJavaMailProperties();
-        props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
-        props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        this.mailSender = impl;
-
-        log.info("EmailChangeEmailService initialized with host={} port={}", host, port);
-    }
+    @Value("${mail.username}") private String fromAddress;
 
     /** [a] Ask confirmation in the NEW e-mail. */
     public void sendConfirmNew(String toEmail, String name, String confirmLink, int minutes) {
@@ -75,8 +46,6 @@ public class EmailChangeEmailService {
         sendHtml(oldEmail, subject, html);
     }
 
-    /* helpers */
-
     private void sendHtml(String toEmail, String subject, String html) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -84,7 +53,7 @@ public class EmailChangeEmailService {
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
-            try { helper.setFrom(username, brandName); } catch (Exception ignore) { helper.setFrom(username); }
+            try { helper.setFrom(fromAddress, branding.brandName()); } catch (Exception ignore) { helper.setFrom(fromAddress); }
             mailSender.send(message);
             log.info("[MAIL] Sent '{}' to {}", subject, toEmail);
         } catch (Exception e) {
@@ -95,6 +64,8 @@ public class EmailChangeEmailService {
     private String buildHtmlConfirm(String name, String confirmLink, int minutes) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         int year = Year.now().getValue();
+        String logoUrl = branding.safeLogoUrl();
+
         return """
             <!doctype html>
             <html lang="en">
@@ -131,13 +102,15 @@ public class EmailChangeEmailService {
                 </div>
               </div>
             </body></html>
-            """.formatted(logoUrl, brandName, brandName, safeName, minutes, confirmLink, year);
+            """.formatted(logoUrl, branding.brandName(), branding.brandName(), safeName, minutes, confirmLink, year);
     }
 
     private String buildHtmlChanged(String name) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         int year = Year.now().getValue();
-        String loginUrl = frontendBaseUrl + "/login";
+        String loginUrl = branding.frontendUrl() + "/login";
+        String logoUrl = branding.safeLogoUrl();
+
         return """
             <!doctype html>
             <html lang="en">
@@ -173,13 +146,15 @@ public class EmailChangeEmailService {
                 </div>
               </div>
             </body></html>
-            """.formatted(logoUrl, brandName, brandName, safeName, loginUrl, year);
+            """.formatted(logoUrl, branding.brandName(), branding.brandName(), safeName, loginUrl, year);
     }
 
     private String buildHtmlAlertOld(String name, String supportUrl) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         int year = Year.now().getValue();
-        String url = (supportUrl == null || supportUrl.isBlank()) ? (frontendBaseUrl + "/support") : supportUrl;
+        String url = (supportUrl == null || supportUrl.isBlank()) ? (branding.frontendUrl() + "/support") : supportUrl;
+        String logoUrl = branding.safeLogoUrl();
+
         return """
             <!doctype html>
             <html lang="en">
@@ -215,7 +190,7 @@ public class EmailChangeEmailService {
                 </div>
               </div>
             </body></html>
-            """.formatted(logoUrl, brandName, brandName, safeName, url, year);
+            """.formatted(logoUrl, branding.brandName(), branding.brandName(), safeName, url, year);
     }
 
     private static String escapeHtml(String s) {

@@ -1,6 +1,10 @@
 spring:
   application:
     name: ${APPLICATION_NAME}
+    brand:
+      name: "Diana Global"
+      frontend-url: "https://www.dianaglobal.com.br"
+      logo-url: "https://andescore-landingpage.vercel.app/AndesCore.jpg" # troque aqui quando quiser
 
     google:
       oauth:

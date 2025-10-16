@@ -35,6 +35,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import com.dianaglobal.loginregister.application.service.exception.TokenAlreadyUsedException;
+import com.dianaglobal.loginregister.application.service.exception.TokenExpiredException;
+
 
 import java.net.URI;
 import java.time.Duration;
@@ -492,4 +495,28 @@ public class AuthController {
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new MessageResponse("User not found")));
     }
+
+    // ===================== Confirmar conta (GET/POST) =====================
+    @RequestMapping(
+            value = "/confirm-account",
+            method = { RequestMethod.GET, RequestMethod.POST },
+            produces = CT_JSON
+    )
+    public ResponseEntity<MessageResponse> confirmAccount(@RequestParam("token") String token) {
+        try {
+            accountConfirmationService.confirm(token);
+            return ResponseEntity.ok(new MessageResponse("E-mail confirmed successfully"));
+        } catch (IllegalArgumentException ex) {
+            String msg = (ex.getMessage() == null || ex.getMessage().isBlank())
+                    ? "Invalid or expired confirmation link"
+                    : ex.getMessage();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new MessageResponse(msg));
+        } catch (Exception ex) {
+            String id = UUID.randomUUID().toString();
+            log.error("[CONFIRM ERROR {}] {}", id, ex.getMessage(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Internal error. Code: " + id));
+        }
+    }
+
 }

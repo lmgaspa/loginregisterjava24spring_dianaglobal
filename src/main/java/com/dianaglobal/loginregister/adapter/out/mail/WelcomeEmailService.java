@@ -1,62 +1,31 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/WelcomeEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import jakarta.annotation.PostConstruct;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
 import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
-import java.util.Properties;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class WelcomeEmailService {
 
-    @Value("${mail.host}") private String host;
-    @Value("${mail.port}") private int port;
-    @Value("${mail.username}") private String username;
-    @Value("${mail.password}") private String password;
-    @Value("${mail.properties.mail.smtp.auth:true}") private boolean smtpAuth;
-    @Value("${mail.properties.mail.smtp.starttls.enable:true}") private boolean startTls;
+    private final JavaMailSender mailSender;
+    private final MailBranding branding;
 
-    @Value("${application.brand.name:Diana Global}")
-    private String brandName;
-
-    @Value("${application.frontend.url:https://www.dianaglobal.com.br}")
-    private String frontendBaseUrl;
-
-    @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
-    private String logoUrl;
-
-    private JavaMailSender mailSender;
-
-    @PostConstruct
-    void init() {
-        JavaMailSenderImpl impl = new JavaMailSenderImpl();
-        impl.setHost(host);
-        impl.setPort(port);
-        impl.setUsername(username);
-        impl.setPassword(password);
-        impl.setDefaultEncoding(StandardCharsets.UTF_8.name());
-
-        Properties props = impl.getJavaMailProperties();
-        props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
-        props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        // Se usar 465/SSL: props.put("mail.smtp.ssl.enable", "true");
-        this.mailSender = impl;
-
-        log.info("WelcomeEmailService initialized with host={} port={}", host, port);
-    }
+    @Value("${mail.username}") private String fromAddress; // só o remetente
 
     public void send(String toEmail, String name) {
         try {
-            String subject = "🎉 Welcome to " + brandName + "!";
+            String subject = "🎉 Welcome to " + branding.brandName() + "!";
             String html = buildHtml(name);
 
             MimeMessage message = mailSender.createMimeMessage();
@@ -64,7 +33,7 @@ public class WelcomeEmailService {
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
-            try { helper.setFrom(username, brandName); } catch (Exception ignore) { helper.setFrom(username); }
+            try { helper.setFrom(fromAddress, branding.brandName()); } catch (Exception ignore) { helper.setFrom(fromAddress); }
 
             mailSender.send(message);
             log.info("Welcome e-mail sent to {}", toEmail);
@@ -76,6 +45,7 @@ public class WelcomeEmailService {
     private String buildHtml(String name) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         int year = Year.now().getValue();
+        String logoUrl = branding.safeLogoUrl();
 
         return """
             <!doctype html>
@@ -87,8 +57,6 @@ public class WelcomeEmailService {
             </head>
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
-
-                <!-- HEADER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
@@ -104,7 +72,6 @@ public class WelcomeEmailService {
                   </table>
                 </div>
 
-                <!-- CONTEÚDO -->
                 <div style="padding:24px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
                   <p style="margin:0 0 12px;line-height:1.55">
@@ -119,7 +86,6 @@ public class WelcomeEmailService {
                   </p>
                 </div>
 
-                <!-- FOOTER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
                             padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
@@ -130,14 +96,14 @@ public class WelcomeEmailService {
             </body>
             </html>
             """.formatted(
-                brandName,       // <title>
-                logoUrl,         // img src
-                brandName,       // img alt
-                brandName,       // header brand
-                safeName,        // Hello, X
-                brandName,       // platform name
-                frontendBaseUrl, // login base
-                year             // © %d
+                branding.brandName(),
+                logoUrl,
+                branding.brandName(),
+                branding.brandName(),
+                safeName,
+                branding.brandName(),
+                branding.frontendUrl(),
+                year
         );
     }
 
