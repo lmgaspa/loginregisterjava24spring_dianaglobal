@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -51,7 +50,6 @@ public class EmailChangeConfirmNewEmailService {
         final String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         final String safeLogo = branding.safeLogoUrl();
         final int year = Year.now().getValue();
-        final String msgId = UUID.randomUUID().toString();
 
         return """
             <!doctype html>
@@ -93,7 +91,7 @@ public class EmailChangeConfirmNewEmailService {
                 header("Confirm your new e-mail", safeLogo, brand),
                 safeName, minutes,
                 ctaButton(confirmLink, "Confirm new e-mail"),
-                footer(year, msgId)
+                footer(year)
         );
     }
 
@@ -128,15 +126,17 @@ public class EmailChangeConfirmNewEmailService {
         );
     }
 
-    private String footer(int year, String msgId) {
+    private String footer(int year) {
         return """
             <tr>
               <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;">
                 <span role="img" aria-label="lightning" style="font-size:20px;vertical-align:middle;">&#9889;&#65039;</span>
-                <span style="vertical-align:middle;font-size:13px;line-height:1.4;">&nbsp;© %d · Powered by <strong>AndesCore Software</strong> · id:%s&#8203;</span>
+                <span style="vertical-align:middle;font-size:13px;line-height:1.4;">
+                  &nbsp;© %d · Powered by <strong>AndesCore Software</strong>&#8203;
+                </span>
               </td>
             </tr>
-            """.formatted(year, escapeHtml(msgId));
+            """.formatted(year);
     }
 
     private String ctaButton(String href, String label) {

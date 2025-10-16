@@ -47,7 +47,6 @@ public class PasswordResetEmailService {
         String safeName = (name == null || name.isBlank()) ? "customer" : escapeHtml(name);
         int year = Year.now().getValue();
         String subtitle = "Password reset";
-        String shortId = String.format("%06x", Math.abs((link + ":" + minutes).hashCode()) & 0xFFFFFF);
         String logoUrl = branding.safeLogoUrl();
 
         return """
@@ -57,14 +56,15 @@ public class PasswordResetEmailService {
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
               <title>%s – Password Reset</title>
+              <style>img{display:block}</style>
             </head>
-            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
+            <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px;margin:0;color:#111827;">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
-                  <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+                  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
                       <td style="width:64px;vertical-align:middle;">
-                        <img src="%s" alt="%s" width="56" style="display:block;border-radius:6px;">
+                        <img src="%s" alt="%s" width="56" height="56" style="display:block;border-radius:6px;width:56px;height:56px;outline:none;border:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
                       </td>
                       <td style="text-align:right;vertical-align:middle;">
                         <div style="font-weight:700;font-size:18px;line-height:1;"><strong>%s</strong></div>
@@ -84,7 +84,7 @@ public class PasswordResetEmailService {
                   </p>
                   <p style="margin:20px 0">
                     <a href="%s" target="_blank" rel="noopener noreferrer"
-                       style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;background:#111827;color:#fff;font-weight:600">
+                       style="display:inline-block;padding:12px 18px;border-radius:8px;text-decoration:none;background:#111827;color:#fff;font-weight:600;font-size:14px;">
                       Reset my password
                     </a>
                   </p>
@@ -95,9 +95,11 @@ public class PasswordResetEmailService {
                     If the button doesn’t work, copy and paste this link into your browser:<br>%s
                   </p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="raio" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong> · id:%s</span>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
+                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="lightning"
+                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">&nbsp;© %d · Powered by <strong>AndesCore Software</strong>&#8203;</span>
                 </div>
               </div>
             </body>
@@ -113,13 +115,13 @@ public class PasswordResetEmailService {
                 minutes,
                 link,
                 link,
-                year,
-                shortId
+                year
         );
     }
 
     private static String escapeHtml(String s) {
-        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+        return s == null ? "" : s.replace("&","&amp;")
+                .replace("<","&lt;").replace(">","&gt;")
                 .replace("\"","&quot;").replace("'","&#x27;");
     }
 }
