@@ -1,11 +1,12 @@
+// src/main/java/com/dianaglobal/loginregister/application/service/AccountConfirmationService.java
 package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.adapter.out.mail.AccountConfirmationEmailService;
 import com.dianaglobal.loginregister.application.event.UserConfirmedListener;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,10 +18,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class AccountConfirmationService {
-
-    private static final Logger log = LoggerFactory.getLogger(AccountConfirmationService.class);
 
     private final UserRepositoryPort userRepository;
     private final AccountConfirmationTokenService confirmationTokenService;
@@ -30,18 +31,6 @@ public class AccountConfirmationService {
 
     @Value("${application.confirmation.minutes:45}")
     private int expirationMinutes;
-
-    public AccountConfirmationService(UserRepositoryPort userRepository,
-                                      AccountConfirmationTokenService confirmationTokenService,
-                                      AccountConfirmationEmailService emailService,
-                                      ConfirmationResendThrottleService throttleService,
-                                      UserConfirmedListener userConfirmedListener) {
-        this.userRepository = userRepository;
-        this.confirmationTokenService = confirmationTokenService;
-        this.emailService = emailService;
-        this.throttleService = throttleService;
-        this.userConfirmedListener = userConfirmedListener;
-    }
 
     /** Dispara (se existir usuário) um novo e-mail de confirmação. */
     public void requestConfirmation(String email, String frontendBaseUrl) {
@@ -65,7 +54,7 @@ public class AccountConfirmationService {
         }
     }
 
-    /** Variante com nome customizável. */
+    /** Variante com nome customizável (opcional). */
     public void requestConfirmation(String email, String name, String frontendBaseUrl, boolean forceName) {
         final String normalized = normalize(email);
         if (normalized == null) return;
@@ -88,15 +77,13 @@ public class AccountConfirmationService {
         }
     }
 
-    /** Consome o token, confirma o e-mail e dispara listener de boas-vindas. */
+    /** Consome o token e confirma o e-mail do usuário. */
     public void confirm(String token) {
         if (token == null || token.isBlank()) {
             throw new IllegalArgumentException("Invalid confirmation token");
         }
 
-        AccountConfirmationTokenService.ConfirmationPayload payload =
-                confirmationTokenService.consume(token);
-
+        var payload = confirmationTokenService.consume(token);
         UUID userId = payload.userId();
         userRepository.markEmailConfirmed(userId);
         log.info("[CONFIRMATION] email confirmed for user {}", userId);
@@ -110,7 +97,7 @@ public class AccountConfirmationService {
         });
     }
 
-    /* ======================== NOVO: Reenvio com cooldown ======================== */
+    /* ======================== Reenvio com cooldown ======================== */
     public record ResendResult(HttpStatus httpStatus, Object body) {}
 
     public ResendResult resendWithThrottle(String email, String frontendBaseUrl, Instant now) {
@@ -118,12 +105,13 @@ public class AccountConfirmationService {
         if (norm == null) {
             return new ResendResult(HttpStatus.BAD_REQUEST, Map.of(
                     "error", "INVALID_EMAIL",
-                    "message", "Email obrigatório"
+                    "message", "Email is required"
             ));
         }
 
         var userOpt = userRepository.findByEmail(norm);
         if (userOpt.isEmpty()) {
+            // Resposta idêntica por segurança (não revelar existência)
             return new ResendResult(HttpStatus.OK, Map.of(
                     "status", "CONFIRMATION_EMAIL_SENT",
                     "canResend", false,
@@ -148,7 +136,7 @@ public class AccountConfirmationService {
         if (!info.canResend()) {
             return new ResendResult(HttpStatus.TOO_MANY_REQUESTS, Map.of(
                     "error", "TOO_MANY_REQUESTS",
-                    "message", "Aguarde para reenviar.",
+                    "message", "Please wait before requesting another confirmation e-mail.",
                     "canResend", false,
                     "cooldownSecondsRemaining", info.cooldownSecondsRemaining(),
                     "attemptsToday", info.attemptsToday(),
@@ -157,6 +145,7 @@ public class AccountConfirmationService {
             ));
         }
 
+        // invalida tokens antigos e emite um novo
         confirmationTokenService.invalidateAllFor(user.getId());
         String rawToken = confirmationTokenService.issue(user.getId(), expirationMinutes);
         String linkUrl = buildConfirmLink(frontendBaseUrl, rawToken);
@@ -179,7 +168,7 @@ public class AccountConfirmationService {
         ));
     }
 
-    // utils
+    /* ======================== utils ======================== */
     private static String normalize(String email) {
         if (email == null) return null;
         String e = email.trim().toLowerCase();

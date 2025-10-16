@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface EmailChangeTokenRepository extends MongoRepository<EmailChangeTokenEntity, UUID> {
-    Optional<EmailChangeTokenEntity> findByTokenHash(String tokenHash);
     List<EmailChangeTokenEntity> findAllByUserIdAndValidTrue(UUID userId);
+    Optional<EmailChangeTokenEntity> findByTokenHash(String tokenHash);
 }

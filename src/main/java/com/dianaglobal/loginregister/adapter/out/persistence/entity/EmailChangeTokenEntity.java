@@ -1,3 +1,4 @@
+// src/main/java/com/dianaglobal/loginregister/adapter/out/persistence/entity/EmailChangeTokenEntity.java
 package com.dianaglobal.loginregister.adapter.out.persistence.entity;
 
 import lombok.*;
@@ -8,11 +9,13 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.UUID;
 
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document("email_change_tokens")
 public class EmailChangeTokenEntity {
-
     @Id
     private UUID id;
 
@@ -20,14 +23,19 @@ public class EmailChangeTokenEntity {
     private UUID userId;
 
     @Indexed(unique = true)
-    private String tokenHash;           // hash do token (ex.: SHA-256 Base64Url)
+    private String tokenHash;
 
     @Indexed
-    private String newEmailNormalized;  // novo e-mail normalizado (lower/trim)
+    private String newEmailNormalized;
 
     private Instant createdAt;
-    private Instant expiresAt;          // TTL por índice programático (TtlIndexRepair)
-    private Instant consumedAt;         // usado/consumido em que momento
-    @Builder.Default
-    private boolean valid = true;       // revogado/uso único
+    private Instant expiresAt;
+    private Instant consumedAt;
+
+    @Indexed
+    private Boolean valid; // usar Boolean para null-safety (TRUE/FALSE)
+
+    public boolean isValid() {
+        return Boolean.TRUE.equals(valid);
+    }
 }

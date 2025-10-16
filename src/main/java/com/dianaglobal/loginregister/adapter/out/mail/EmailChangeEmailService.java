@@ -1,9 +1,9 @@
-// src/main/java/com/dianaglobal/loginregister/adapter/out/mail/EmailChangeEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -14,9 +14,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Year;
 import java.util.Properties;
 
-@Slf4j
 @Component
 public class EmailChangeEmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailChangeEmailService.class);
 
     @Value("${mail.host}") private String host;
     @Value("${mail.port}") private int port;
@@ -53,28 +54,28 @@ public class EmailChangeEmailService {
         log.info("EmailChangeEmailService initialized with host={} port={}", host, port);
     }
 
-    /** [a] Send to the NEW e-mail asking for confirmation (token link). */
+    /** [a] Ask confirmation in the NEW e-mail. */
     public void sendConfirmNew(String toEmail, String name, String confirmLink, int minutes) {
         String subject = "Confirm your new e-mail";
         String html = buildHtmlConfirm(name, confirmLink, minutes);
         sendHtml(toEmail, subject, html);
     }
 
-    /** [c] After confirmation and update, notify the NEW e-mail. */
+    /** [c] Notify the NEW e-mail after change. */
     public void sendChanged(String toEmail, String name) {
         String subject = "Your account e-mail was updated";
         String html = buildHtmlChanged(name);
         sendHtml(toEmail, subject, html);
     }
 
-    /** [b] (optional) Alert the OLD e-mail about a change request. */
+    /** [b] Optional alert to OLD e-mail. */
     public void sendAlertOld(String oldEmail, String name, String supportUrl) {
         String subject = "Security alert: request to change your e-mail";
         String html = buildHtmlAlertOld(name, supportUrl);
         sendHtml(oldEmail, subject, html);
     }
 
-    /* ========== helpers ========== */
+    /* helpers */
 
     private void sendHtml(String toEmail, String subject, String html) {
         try {
@@ -124,8 +125,9 @@ public class EmailChangeEmailService {
                     </a>
                   </p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px">
-                  © %d · <strong>AndesCore Software</strong>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="lightning" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body></html>
@@ -165,8 +167,9 @@ public class EmailChangeEmailService {
                     </a>
                   </p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px">
-                  © %d · <strong>AndesCore Software</strong>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="lightning" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body></html>
@@ -206,8 +209,9 @@ public class EmailChangeEmailService {
                     </a>
                   </p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px">
-                  © %d · <strong>AndesCore Software</strong>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="lightning" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body></html>

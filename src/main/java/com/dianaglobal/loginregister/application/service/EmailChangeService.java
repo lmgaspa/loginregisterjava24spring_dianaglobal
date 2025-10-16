@@ -1,6 +1,9 @@
+// src/main/java/com/dianaglobal/loginregister/application/service/EmailChangeService.java
 package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.adapter.out.mail.EmailChangeEmailService;
+import com.dianaglobal.loginregister.adapter.out.persistence.EmailChangeTokenRepository;
+import com.dianaglobal.loginregister.adapter.out.persistence.entity.EmailChangeTokenEntity;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.domain.model.User;
 import lombok.RequiredArgsConstructor;
@@ -8,9 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,90 +25,118 @@ import java.util.UUID;
 public class EmailChangeService {
 
     private final UserRepositoryPort userRepository;
-    private final EmailChangeTokenService emailChangeTokenService;
-    private final EmailChangeEmailService mailer;
+    private final EmailChangeTokenRepository tokenRepo;
+    private final EmailChangeEmailService emailService;
+    private final RefreshTokenService refreshTokenService; // (se não existir, remova esta linha e o uso mais abaixo)
 
-    /** Token validity (minutes) for e-mail change confirmation. */
-    @Value("${application.emailchange.minutes:45}")
-    private int expirationMinutes;
+    @Value("${application.email-change.minutes:30}")
+    private int ttlMinutes;
 
-    /** Step 1: user requests to change e-mail -> send confirmation link to NEW e-mail. */
-    public void requestChange(UUID userId, String newEmailNormalized, String frontendBaseUrl) {
-        if (userId == null) throw new IllegalArgumentException("userId is required");
-        String newEmail = normalize(newEmailNormalized);
-        if (newEmail == null) throw new IllegalArgumentException("Invalid e-mail");
-
-        // ensure user exists
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // deny if newEmail already in use
-        Optional<User> existing = userRepository.findByEmail(newEmail);
-        if (existing.isPresent() && !existing.get().getId().equals(userId)) {
-            throw new IllegalArgumentException("E-mail is already registered");
-        }
-
-        // single-use: invalidate previous tokens then issue a new one
-        emailChangeTokenService.invalidateAllFor(userId);
-        String raw = emailChangeTokenService.issue(
-                userId, newEmail, Duration.ofMinutes(expirationMinutes));
-
-        String link = buildConfirmLink(frontendBaseUrl, raw);
-        // send to NEW email
-        mailer.sendConfirmNew(newEmail, user.getName(), link, expirationMinutes);
-
-        // optional: alert OLD email
+    private static String sha256Base64(String raw) {
         try {
-            mailer.sendAlertOld(user.getEmail(), user.getName(), frontendBaseUrl + "/support");
-        } catch (Exception ignore) {
-            log.debug("[EMAIL CHANGE] alert to old e-mail failed silently.");
+            var md = MessageDigest.getInstance("SHA-256");
+            return Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(md.digest(raw.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 
-    /** Step 2: user clicks confirmation link -> consume token and update e-mail. */
-    public void confirm(String token) {
-        EmailChangeTokenService.Payload payload = emailChangeTokenService.consume(token);
-        UUID userId = payload.userId();
-        String newEmail = payload.newEmail();
-
-        // ensure not used by another account (race condition)
-        Optional<User> existing = userRepository.findByEmail(newEmail);
-        if (existing.isPresent() && !existing.get().getId().equals(userId)) {
-            throw new IllegalArgumentException("E-mail is already registered");
-        }
-
-        // update email (mark confirmed true since link was verified)
+    public void requestChange(UUID userId, String newEmailNormalized, String frontendBaseUrl) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // invalida tokens antigos pendentes
+        tokenRepo.findAllByUserIdAndValidTrue(userId).forEach(t -> {
+            t.setValid(false);
+            tokenRepo.save(t);
+        });
+
+        // token bruto + hash
+        String rawToken = UUID.randomUUID() + "." + UUID.randomUUID();
+        String hash = sha256Base64(rawToken);
+
+        Instant now = Instant.now();
+        EmailChangeTokenEntity entity = EmailChangeTokenEntity.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .tokenHash(hash)
+                .newEmailNormalized(newEmailNormalized)
+                .createdAt(now)
+                .expiresAt(now.plus(Duration.ofMinutes(ttlMinutes)))
+                .valid(true)
+                .build();
+        tokenRepo.save(entity);
+
+        // link para o NOVO e-mail
+        String link = buildConfirmLink(frontendBaseUrl, rawToken);
+
+        emailService.sendConfirmNew(newEmailNormalized, user.getName(), link, ttlMinutes);
+
+        // opcional: alerta para o antigo
+        try {
+            if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                emailService.sendAlertOld(user.getEmail(), user.getName(), frontendBaseUrl + "/support");
+            }
+        } catch (Exception ex) {
+            log.warn("[EMAIL-CHANGE] alert-old send warn: {}", ex.getMessage());
+        }
+    }
+
+    public void confirm(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+        String hash = sha256Base64(rawToken);
+
+        EmailChangeTokenEntity t = tokenRepo.findByTokenHash(hash)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+
+        Instant now = Instant.now();
+        if (!t.isValid() || t.getConsumedAt() != null) {
+            throw new IllegalArgumentException("Token already used or invalid");
+        }
+        if (t.getExpiresAt() != null && now.isAfter(t.getExpiresAt())) {
+            throw new IllegalArgumentException("Token expired");
+        }
+
+        UUID userId = t.getUserId();
+        String newEmail = t.getNewEmailNormalized();
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        String oldEmail = user.getEmail();
         user.setEmail(newEmail);
         user.setEmailConfirmed(true);
         userRepository.save(user);
 
-        // notify the NEW email
-        try {
-            mailer.sendChanged(newEmail, user.getName());
-        } catch (Exception e) {
-            log.warn("[EMAIL CHANGE] notify changed failed: {}", e.getMessage());
-        }
-    }
+        t.setConsumedAt(now);
+        t.setValid(false);
+        tokenRepo.save(t);
+        tokenRepo.findAllByUserIdAndValidTrue(userId).forEach(other -> {
+            other.setValid(false);
+            tokenRepo.save(other);
+        });
 
-    // ===== utils =====
-    private static String normalize(String email) {
-        if (email == null) return null;
-        String e = email.trim().toLowerCase();
-        return e.isBlank() ? null : e;
+        // Se você tiver mesmo um método para revogar todas as sessões do e-mail antigo, use aqui.
+        // Exemplo (AJUSTE ao seu RefreshTokenService real):
+        // try { if (oldEmail != null) refreshTokenService.revokeAllFor(oldEmail); } catch (Exception ignore) {}
+
+        try {
+            emailService.sendChanged(newEmail, user.getName());
+        } catch (Exception ex) {
+            log.warn("[EMAIL-CHANGE] changed-mail warn: {}", ex.getMessage());
+        }
+
+        log.info("[EMAIL-CHANGE] user {} changed e-mail {} -> {}", userId, oldEmail, newEmail);
     }
 
     private static String buildConfirmLink(String frontendBaseUrl, String token) {
         String base = (frontendBaseUrl == null || frontendBaseUrl.isBlank())
                 ? "https://www.dianaglobal.com.br"
                 : frontendBaseUrl.trim();
-
-        String path = "email-change/confirm?token=" + urlEncode(token);
+        String path = "email-change/confirm?token=" + token;
         return base.endsWith("/") ? base + path : base + "/" + path;
-    }
-
-    private static String urlEncode(String v) {
-        return URLEncoder.encode(v, StandardCharsets.UTF_8);
     }
 }

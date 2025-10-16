@@ -1,3 +1,4 @@
+// src/main/java/com/dianaglobal/loginregister/application/service/EmailChangeTokenServiceImpl.java
 package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.adapter.out.persistence.EmailChangeTokenRepository;
@@ -21,7 +22,6 @@ public class EmailChangeTokenServiceImpl implements EmailChangeTokenService {
 
     private final EmailChangeTokenRepository repo;
 
-    /* =================== helpers =================== */
     private static String sha256Base64Url(String raw) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -33,11 +33,9 @@ public class EmailChangeTokenServiceImpl implements EmailChangeTokenService {
     }
 
     private static String newRawToken() {
-        // token longo e randômico (dois UUIDs concatenados)
         return UUID.randomUUID() + "." + UUID.randomUUID();
     }
 
-    /* =================== API =================== */
     @Override
     public void invalidateAllFor(UUID userId) {
         List<EmailChangeTokenEntity> tokens = repo.findAllByUserIdAndValidTrue(userId);
@@ -72,7 +70,7 @@ public class EmailChangeTokenServiceImpl implements EmailChangeTokenService {
                 .build();
 
         repo.save(entity);
-        return raw; // retornar o plaintext para colocar no link do e-mail
+        return raw;
     }
 
     @Override
@@ -87,16 +85,13 @@ public class EmailChangeTokenServiceImpl implements EmailChangeTokenService {
 
         Instant now = Instant.now();
 
-        // expiração
         if (t.getExpiresAt() != null && now.isAfter(t.getExpiresAt())) {
             throw new TokenExpiredException("Token expired");
         }
-        // uso único
-        if (!Boolean.TRUE.equals(t.isValid()) || t.getConsumedAt() != null) {
+        if (!t.isValid() || t.getConsumedAt() != null) {
             throw new TokenAlreadyUsedException("Token already used");
         }
 
-        // consome e invalida
         t.setConsumedAt(now);
         t.setValid(false);
         repo.save(t);

@@ -70,7 +70,7 @@ public class AuthController {
     private final CsrfTokenService csrfTokenService;
     private final PasswordSetEmailService passwordSetEmailService;
     private final ConfirmationResendThrottleService confirmationResendThrottleService;
-    private final EmailChangeService emailChangeService; // <-- NEW
+    private final EmailChangeService emailChangeService; // NEW
 
     @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
@@ -324,7 +324,12 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("We sent a confirmation link to your new e-mail."));
     }
 
-    @PostMapping(value = "/email/change-confirm", produces = CT_JSON)
+    // (ÚNICO endpoint para GET/POST)
+    @RequestMapping(
+            value = "/email/change-confirm",
+            method = { RequestMethod.GET, RequestMethod.POST },
+            produces = CT_JSON
+    )
     public ResponseEntity<MessageResponse> confirmEmailChange(@RequestParam("token") String token) {
         emailChangeService.confirm(token);
         return ResponseEntity.ok(new MessageResponse("E-mail changed successfully"));
@@ -350,9 +355,6 @@ public class AuthController {
         userRepositoryPort.save(user);
 
         try { passwordSetEmailService.sendChange(user.getEmail(), user.getName()); } catch (Exception ignored) {}
-
-        // Nota: se quiser invalidar TODAS as sessões, exponha um método apropriado no RefreshTokenService e use-o aqui.
-        // (Removido o revokeAllFor inexistente para compilar agora.)
 
         return ResponseEntity.ok(new MessageResponse("Password changed successfully"));
     }
@@ -489,24 +491,5 @@ public class AuthController {
                 )))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new MessageResponse("User not found")));
-    }
-
-    // ===================== Confirmar conta =====================
-    @PostMapping(value = "/confirm-account", produces = CT_JSON)
-    public ResponseEntity<MessageResponse> confirmAccount(@RequestParam("token") String token) {
-        try {
-            accountConfirmationService.confirm(token);
-            return ResponseEntity.ok(new MessageResponse("E-mail confirmed successfully"));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new MessageResponse(ex.getMessage() == null
-                            ? "Invalid or expired confirmation link"
-                            : ex.getMessage()));
-        } catch (Exception ex) {
-            String id = UUID.randomUUID().toString();
-            log.error("[CONFIRM ERROR {}] {}", id, ex.getMessage(), ex);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new MessageResponse("Internal error. Code: " + id));
-        }
     }
 }

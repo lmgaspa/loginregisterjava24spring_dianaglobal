@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
 import java.util.Properties;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -28,7 +29,9 @@ public class AccountConfirmationEmailService {
     @Value("${application.brand.name:Diana Global}")
     private String brandName;
 
-    // Agora usamos URL externa para o logo (sem anexar inline/CID)
+    @Value("${application.frontend.url:https://www.dianaglobal.com.br}")
+    private String frontendBaseUrl;
+
     @Value("${mail.logo.url:https://andescore-landingpage.vercel.app/AndesCore.jpg}")
     private String logoUrl;
 
@@ -51,35 +54,32 @@ public class AccountConfirmationEmailService {
         log.info("AccountConfirmationEmailService initialized with host={} port={}", host, port);
     }
 
-    /** minutes deve ser INT. */
-    public void send(String toEmail, String toName, String link, int minutes) {
-        try {
-            String subject = brandName + " – Confirm your account";
-            String html = buildHtml(toName, link, minutes);
+    /** Assinatura esperada pelo AccountConfirmationService */
+    public void send(String toEmail, String name, String confirmLink, int minutes) {
+        final String subject = "Confirm your e-mail";
+        final String html = buildHtml(name, confirmLink, minutes);
+        sendHtml(toEmail, subject, html);
+    }
 
+    private void sendHtml(String toEmail, String subject, String html) {
+        try {
             MimeMessage message = mailSender.createMimeMessage();
-            // multipart=false (não anexamos imagem inline/CID)
             MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
             try { helper.setFrom(username, brandName); } catch (Exception ignore) { helper.setFrom(username); }
-
-            // REMOVIDO: addInline/attachments (evita “inline/noname” no Gmail)
-
             mailSender.send(message);
-            log.info("Account confirmation e-mail sent to {}", toEmail);
+            log.info("[MAIL] Sent '{}' to {}", subject, toEmail);
         } catch (Exception e) {
-            log.error("Error sending account confirmation e-mail to {}: {}", toEmail, e.getMessage(), e);
-            throw new RuntimeException("Failed to send account confirmation e-mail", e);
+            log.error("[MAIL] Error sending '{}' to {}: {}", subject, toEmail, e.getMessage(), e);
         }
     }
 
-    private String buildHtml(String name, String link, int minutes) {
+    private String buildHtml(String name, String confirmLink, int minutes) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
-        String title = brandName + " – Confirm your account";
-        String subtitle = "Confirm your account";
         int year = Year.now().getValue();
+        String msgId = UUID.randomUUID().toString(); // id opcional para rastreio
 
         return """
             <!doctype html>
@@ -87,12 +87,12 @@ public class AccountConfirmationEmailService {
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width"/>
-              <title>%s</title>
+              <title>Confirm your e-mail · %s</title>
             </head>
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
 
-                <!-- HEADER-->
+                <!-- HEADER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:16px 20px;">
                   <table width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
                     <tr>
@@ -102,60 +102,58 @@ public class AccountConfirmationEmailService {
                       <td style="text-align:right;vertical-align:middle;">
                         <div style="font-weight:700;font-size:18px;line-height:1;"><strong>%s</strong></div>
                         <div style="height:6px;line-height:6px;font-size:0;">&nbsp;</div>
-                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">%s</div>
+                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">Confirm your e-mail</div>
                       </td>
                     </tr>
                   </table>
                 </div>
 
-                <!-- CONTEÚDO -->
+                <!-- CONTENT -->
                 <div style="padding:24px">
                   <p style="font-size:16px;margin:0 0 12px">Hello, <strong>%s</strong>!</p>
                   <p style="margin:0 0 12px;line-height:1.55">
-                    Thanks for signing up to <strong>%s</strong>. Please confirm your account:
+                    Thanks for signing up. To finish creating your account, please confirm your e-mail address.
+                    This link expires in <strong>%d minutes</strong>.
                   </p>
+
                   <p style="margin:20px 0">
                     <a href="%s" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 18px;border-radius:6px;text-decoration:none;
                               background:#111827;color:#fff;font-weight:600">
-                      Confirm my account
+                      Confirm e-mail
                     </a>
                   </p>
-                  <p style="margin:0 0 12px;line-height:1.55">
-                    For your security, this link expires in <strong>%d minutes</strong> and can be used only once.
-                  </p>
-                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
-                    If the button doesn’t work, copy and paste this link into your browser:<br>%s
+
+                  <p style="margin:0 0 12px;line-height:1.55;color:#374151">
+                    If you didn’t request this, please ignore this message or contact support.
                   </p>
                 </div>
 
-                <!-- FOOTER-->
+                <!-- FOOTER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
                             padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="raio"
+                  <span role="img" aria-label="lightning"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong> · id:%s</span>
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
-                title,
-                logoUrl,               // <img src>
-                brandName,             // alt
-                brandName,             // <strong>...</strong>
-                subtitle,              // linha de subtítulo
-                safeName,
-                brandName,
-                link,
-                minutes,
-                link,
-                year
+                brandName,       // <title> brand
+                logoUrl,         // img src
+                brandName,       // img alt
+                brandName,       // header brand
+                safeName,        // Hello, X
+                minutes,         // expires in X minutes
+                confirmLink,     // CTA link
+                year,            // © year
+                msgId            // footer id
         );
     }
 
     private static String escapeHtml(String s) {
-        return s.replace("&","&amp;")
+        return s == null ? "" : s.replace("&","&amp;")
                 .replace("<","&lt;")
                 .replace(">","&gt;")
                 .replace("\"","&quot;")
