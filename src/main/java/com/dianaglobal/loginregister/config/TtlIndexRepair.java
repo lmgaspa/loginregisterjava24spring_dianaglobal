@@ -2,6 +2,7 @@ package com.dianaglobal.loginregister.config;
 
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.AccountConfirmationTokenEntity;
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.ConfirmResendThrottleEntity;
+import com.dianaglobal.loginregister.adapter.out.persistence.entity.EmailChangeTokenEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
@@ -33,5 +34,8 @@ public class TtlIndexRepair {
                 .ensureIndex(new Index().on("expiresAt", Sort.Direction.ASC).expire(Duration.ZERO));
 
         log.info("[TTL] TTL indexes ensured for throttle and confirmation tokens");
+
+        mongoTemplate.indexOps(EmailChangeTokenEntity.class)
+                .ensureIndex(new Index().on("expiresAt", Sort.Direction.ASC).expire(Duration.ZERO));
     }
 }

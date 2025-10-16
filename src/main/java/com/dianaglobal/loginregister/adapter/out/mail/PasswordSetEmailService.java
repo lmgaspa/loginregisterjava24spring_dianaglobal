@@ -48,17 +48,17 @@ public class PasswordSetEmailService {
         Properties props = impl.getJavaMailProperties();
         props.put("mail.smtp.auth", Boolean.toString(smtpAuth));
         props.put("mail.smtp.starttls.enable", Boolean.toString(startTls));
-        // Se usar 465/SSL: props.put("mail.smtp.ssl.enable", "true");
+        // If using 465/SSL: props.put("mail.smtp.ssl.enable", "true");
         this.mailSender = impl;
 
         log.info("PasswordSetEmailService initialized with host={} port={}", host, port);
     }
 
     /**
-     * Envia e-mail informando criação/alteração de senha.
-     * @param toEmail e-mail do destinatário
-     * @param name nome do usuário (pode ser null/blank)
-     * @param firstDefinition true = primeira definição (usuário Google criando senha local); false = alteração de senha
+     * Sends an e-mail informing password creation/change.
+     * @param toEmail recipient e-mail
+     * @param name    user name (can be null/blank)
+     * @param firstDefinition true = first password setup; false = password change
      */
     public void send(String toEmail, String name, boolean firstDefinition) {
         try {
@@ -82,12 +82,12 @@ public class PasswordSetEmailService {
         }
     }
 
-    /** Atalho semântico para primeira definição de senha. */
+    /** Semantic shortcut for the first password definition. */
     public void sendFirstDefinition(String toEmail, String name) {
         send(toEmail, name, true);
     }
 
-    /** Atalho semântico para alteração de senha. */
+    /** Semantic shortcut for a password change (security alert). */
     public void sendChange(String toEmail, String name) {
         send(toEmail, name, false);
     }
@@ -96,9 +96,7 @@ public class PasswordSetEmailService {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
         int year = Year.now().getValue();
 
-        String title = firstDefinition
-                ? "Password created"
-                : "Password changed";
+        String title = firstDefinition ? "Password created" : "Password changed";
 
         String lead = firstDefinition
                 ? "Your password has been successfully created "
@@ -108,8 +106,7 @@ public class PasswordSetEmailService {
                 ? "From now on, you can sign in using your e-mail and this password (besides Google Login)."
                 : "If this change wasn't made by you, please reset your password immediately.";
 
-        String actionHref = firstDefinition ? "%s/login" : "%s/reset-password";
-
+        String actionHref = firstDefinition ? "%s/login" : "%s/forgot-password"; // point change flow to forgot-password
         String actionLabel = firstDefinition ? "Access your account" : "Reset your password";
 
         String advisory = firstDefinition
@@ -163,27 +160,27 @@ public class PasswordSetEmailService {
                 <!-- FOOTER -->
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
                             padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="raio"
+                  <span role="img" aria-label="bolt"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body>
             </html>
             """.formatted(
-                title,                  // <title> left part
-                brandName,              // <title> right part
-                logoUrl,                // header logo src
-                brandName,              // header logo alt
-                brandName,              // header brand text
-                safeName,               // Hello, X
-                lead,                   // "Password created/changed..."
-                brandName,              // "...at BRAND"
-                sub,                    // explanation / security note
+                title,                         // <title> left part
+                brandName,                     // <title> right part
+                logoUrl,                       // header logo src
+                brandName,                     // header logo alt
+                brandName,                     // header brand text
+                safeName,                      // Hello, X
+                lead,                          // "Password created/changed ..."
+                brandName,                     // "... at BRAND"
+                sub,                           // explanation / security note
                 actionHref.formatted(frontendBaseUrl), // CTA href
-                actionLabel,            // CTA label
-                advisory,               // extra advisory
-                year                    // © year
+                actionLabel,                   // CTA label
+                advisory,                      // extra advisory
+                year                           // © year
         );
     }
 
@@ -195,4 +192,3 @@ public class PasswordSetEmailService {
                 .replace("'","&#x27;");
     }
 }
-//

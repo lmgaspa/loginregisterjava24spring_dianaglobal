@@ -134,7 +134,7 @@ public class AccountConfirmationEmailService {
                             padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
                   <span role="img" aria-label="raio"
                         style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>Andes Core Software</strong></span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body>

@@ -1,20 +1,17 @@
 package com.dianaglobal.loginregister.adapter.in.web;
 
+import com.dianaglobal.loginregister.adapter.in.dto.ApiError;
 import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.OAuthGoogleRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.ProfileResponseDTO;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.password.ChangePasswordRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
+import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
-import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
-import com.dianaglobal.loginregister.application.service.JwtService;
-import com.dianaglobal.loginregister.application.service.RefreshTokenService;
-import com.dianaglobal.loginregister.application.service.UserService;
-import com.dianaglobal.loginregister.application.service.ConfirmationResendThrottleService;
-import com.dianaglobal.loginregister.adapter.in.dto.ApiError;
-import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
+import com.dianaglobal.loginregister.application.service.*;
 import com.dianaglobal.loginregister.domain.model.User;
 import com.dianaglobal.loginregister.security.CsrfTokenService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -73,6 +70,7 @@ public class AuthController {
     private final CsrfTokenService csrfTokenService;
     private final PasswordSetEmailService passwordSetEmailService;
     private final ConfirmationResendThrottleService confirmationResendThrottleService;
+    private final EmailChangeService emailChangeService; // <-- NEW
 
     @Value("${application.frontend.base-url:https://www.dianaglobal.com.br}")
     private String frontendBaseUrl;
@@ -181,7 +179,7 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid credentials"));
         }
 
-        // >>> NOVO: e-mail não confirmado => erro tipado + metadados de cooldown
+        // E-mail não confirmado => erro tipado + metadados de cooldown
         if (!user.isEmailConfirmed()) {
             var info = confirmationResendThrottleService.preview(user.getId(), Instant.now());
             var body = ApiError.builder()
@@ -236,7 +234,7 @@ public class AuthController {
             email = email.trim().toLowerCase();
             User user = registerService.registerOauthUser(name, email, sub);
 
-            // Garante provider/flags
+            // Provider/flags
             String provider = user.getAuthProvider();
             if (provider == null || !"GOOGLE".equalsIgnoreCase(provider)) {
                 user.setAuthProvider("GOOGLE");
@@ -303,6 +301,60 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse(
                 wasPasswordSetBefore ? "Password changed successfully" : "Password set successfully"
         ));
+    }
+
+    // ===================== EMAIL CHANGE (request/confirm) =====================
+    public record ChangeEmailRequest(
+            @Email(message="Invalid e-mail")
+            @Pattern(regexp="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+                    message="E-mail must contain a valid domain")
+            String newEmail
+    ) {}
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping(value = "/email/change-request", consumes = CT_JSON, produces = CT_JSON)
+    public ResponseEntity<MessageResponse> requestEmailChange(
+            @AuthenticationPrincipal UserDetails principal,
+            @RequestBody @Valid ChangeEmailRequest req) {
+
+        var user = userRepositoryPort.findByEmail(principal.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        emailChangeService.requestChange(user.getId(), req.newEmail().trim().toLowerCase(), frontendBaseUrl);
+        return ResponseEntity.ok(new MessageResponse("We sent a confirmation link to your new e-mail."));
+    }
+
+    @PostMapping(value = "/email/change-confirm", produces = CT_JSON)
+    public ResponseEntity<MessageResponse> confirmEmailChange(@RequestParam("token") String token) {
+        emailChangeService.confirm(token);
+        return ResponseEntity.ok(new MessageResponse("E-mail changed successfully"));
+    }
+
+    // ===================== PASSWORD CHANGE (autenticado) =====================
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping(value = "/password/change", consumes = CT_JSON, produces = CT_JSON)
+    public ResponseEntity<MessageResponse> changePassword(
+            @AuthenticationPrincipal UserDetails principal,
+            @RequestBody @Valid ChangePasswordRequest body) {
+
+        var user = userRepositoryPort.findByEmail(principal.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!passwordEncoder.matches(body.currentPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Current password is incorrect"));
+        }
+
+        user.setPassword(passwordEncoder.encode(body.newPassword()));
+        user.setPasswordSet(true);
+        userRepositoryPort.save(user);
+
+        try { passwordSetEmailService.sendChange(user.getEmail(), user.getName()); } catch (Exception ignored) {}
+
+        // Nota: se quiser invalidar TODAS as sessões, exponha um método apropriado no RefreshTokenService e use-o aqui.
+        // (Removido o revokeAllFor inexistente para compilar agora.)
+
+        return ResponseEntity.ok(new MessageResponse("Password changed successfully"));
     }
 
     // ===================== PROFILE =====================
