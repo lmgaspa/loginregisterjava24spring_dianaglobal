@@ -4,7 +4,7 @@ spring:
     brand:
       name: "Diana Global"
       frontend-url: "https://www.dianaglobal.com.br"
-      logo-url: "https://andescore-landingpage.vercel.app/AndesCore.jpg" # troque aqui quando quiser
+      logo-url: "https://www.andescoresoftware.com.br/" # troque aqui quando quiser
 
     google:
       oauth:

@@ -39,7 +39,7 @@ public class MailConfig {
     public MailBranding mailBranding(
             @Value("${application.brand.name:Diana Global}") String brandName,
             @Value("${application.brand.frontend-url:https://www.dianaglobal.com.br}") String frontendUrl,
-            @Value("${application.brand.logo-url:https://andescore-landingpage.vercel.app/AndesCore.jpg}") String logoUrl
+            @Value("${application.brand.logo-url:https://www.andescoresoftware.com.br//AndesCore.jpg}") String logoUrl
     ) {
         return new MailBranding(brandName, frontendUrl, logoUrl);
     }
