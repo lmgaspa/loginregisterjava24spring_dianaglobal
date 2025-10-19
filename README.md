@@ -1,133 +1,134 @@
-🔐 Diana Global — Auth & Account API (Interview Summary)
+# 🔐 Diana Global — Auth & Account API (Interview Summary)
 
+## 🔗 API Links
 
+- 🌐 **Base URL (prod):** https://dianagloballoginregister-52599bd07634.herokuapp.com
+- 📘 **OpenAPI (OAS 3.1):** `/api-docs`
+- 🧭 **Swagger UI:** https://dianagloballoginregister-52599bd07634.herokuapp.com/swagger
 
+## 🛠️ Tech Stack
 
+- ☕ **Java:** 24
+- 🌱 **Spring Framework / Spring Boot:** 6.x / 3.x
+- 🧩 **Architecture:** Hexagonal (Ports & Adapters)
+- 🗄️ **Database:** PostgreSQL
+- ☁️ **Cloud:** Heroku
+---
 
+## 🚀 What’s New (2025-10-16)
 
+- ✉️ Email templates refactor: 640px table layout, inline CSS, fixed-size HTTPS logo, accessible CTA, aligned footer, and preheader.
+- 🔀 Email change flow split into 3 services: `confirm-new`, `changed`, `alert-old`.
+- 🔐 Security polish: enforced HTTPS logo URL + Gmail clipping mitigations.
 
+---
 
-Base URL (prod):
-🔗 https://dianagloballoginregister-52599bd07634.herokuapp.com
-OpenAPI: 📘 /api-docs (OAS 3.1)
+## 🧭 Auth Model
 
-🚀 What’s New (2025-10-16)
+- 🔑 Access token: returned in the login JSON body
+- 🍪 Refresh token: HttpOnly cookie `refresh_token` (rotated via `/api/auth/refresh-token`)
+- 🛡️ CSRF: cookie `csrf_token` + header `X-CSRF-Token`
+- 🧾 Sessions: server-side refresh tokens with rotation and revocation on logout
 
-✉️ Email templates refactor (confirmation, email-change ×3, password reset): table layout (640px), inline styles, fixed logo (HTTPS), accessible CTA, footer fix (⚡ alignment), preheader for confirmation.
+---
 
-🔀 Email change flow split into 3 services: confirm-new, changed, alert-old.
+## 🧩 Key Endpoints (by area)
 
-🔐 Security polish: enforce HTTPS logo URL, Gmail clipping mitigations.
+**Base:** `/api/auth`
 
-🧭 Auth Model
+### 🧱 Core
+- `POST /register` — create user (LOCAL) and send confirmation
+- `POST /login` — password login → access + cookies (refresh, csrf)
+- `POST /oauth/google` — login/registration via Google ID Token
+- `POST /logout` — revoke refresh and clear cookies
+- `POST /refresh-token` — rotate refresh and return a new access token
 
-🔑 Access token: JSON response.
+### 🔑 Passwords
+- `POST /password/set` — set password (first access, auth)
+- `POST /password/change` — change password (auth)
 
-🍪 Refresh token: HttpOnly cookie refresh_token (rotated via /api/auth/refresh-token).
+### 📧 Email
+- `POST /email/change-request` — start email change (sends to the new email)
+- `GET|POST /email/change-confirm?token=…` — confirm the change
 
-🛡️ CSRF: cookie csrf_token + header X-CSRF-Token.
+### ✅ Account Confirmation
+- `POST /confirm/resend` — resend account confirmation (cooldown aware)
+- `GET|POST /confirm-account?token=…` — confirm account
 
-🧾 Sessions: server-side refresh tokens + rotation + revoke on logout.
+### 👤 User / Utils
+- `GET /profile` — current user profile (auth)
+- `GET /find-user?email=…` — check existence
+- `GET /confirmed?email=…` — `confirmed` | `not_confirmed`
 
-🧩 Key Endpoints (by area)
-/api/auth
+---
 
-POST /register — create user (LOCAL), sends confirmation.
+## 🔁 Password Reset
 
-POST /login — password login → access + cookies (refresh, csrf).
+- `POST /api/auth/forgot-password` — request a reset link
+- `POST /api/auth/reset-password` — consume token and set a new password
 
-POST /oauth/google — Google ID token login/registration.
+---
 
-POST /logout — revoke refresh + clear cookies.
+## 📝 Privacy
 
-POST /refresh-token — rotate refresh, new access token.
+- `POST /api/privacy/consent` — store/update consent
 
-POST /password/set — first-time set (auth).
+---
 
-POST /password/change — change password (auth).
+## 📦 Core Schemas (OpenAPI)
 
-POST /email/change-request — start email change (sends to new email).
+- `RegisterRequest { name?, email, password }`
+- `LoginRequest { email, password }`
+- `OAuthGoogleRequest { idToken }`
+- `NewPasswordDTO { newPassword }` (≥ 8, upper/lower/digit)
+- `ChangePasswordRequest { currentPassword, newPassword }`
+- `ForgotPasswordRequest { email }`
+- `ChangeEmailRequest { newEmail }`
+- `LoginResponse | AuthResponse { accessToken }`
+- `JwtResponse { token }`
+- `MessageResponse { message }`
 
-GET|POST /email/change-confirm?token=… — confirm email change.
+---
 
-POST /confirm/resend — resend account confirmation (cooldown aware).
+## ⚠️ Errors (typical)
 
-GET|POST /confirm-account?token=… — confirm account.
+- 400 — validation / expired token
+- 401 — auth failure / missing session
+- 403 — CSRF mismatch / provider rules
+- 409 — conflicts (e.g., unconfirmed login, duplicate email)
+- 5xx — internal (with logged error id)
 
-GET /profile — current user profile (auth).
+---
 
-GET /find-user?email=… — existence check.
+## 🎨 Branding (emails)
 
-GET /confirmed?email=… — confirmed | not_confirmed.
+- `MailBranding.brandName()`
+- `MailBranding.safeLogoUrl()` → absolute HTTPS image URL (fixed width/height in templates)
+- `MailBranding.frontendUrl()` → base for CTAs (`/login`, `/support`)
 
-🔁 Password Reset
+---
 
-POST /api/auth/forgot-password — request reset link.
+## ✉️ Email Template Guarantees
 
-POST /api/auth/reset-password — consume token + set password.
+- 640px table layout, inline CSS, fixed logo sizing, accessible CTA
+- Unified header/footer (gradient: `linear-gradient(135deg,#0a2239,#0e4b68)`)
+- Gmail clipping mitigations (lean markup + zero-width character)
 
-📝 Privacy
+## 🧱 Architecture (Brief)
 
-POST /api/privacy/consent — store/update consent.
+### Domain
+Use cases and core rules (framework-agnostic).
 
-👤 User
+### Adapters
+Web (REST controllers), mail, persistence.
 
-GET /api/user/profile — profile (alt route, auth).
+### Config
+Profiles and infrastructure wiring.
 
-📦 Core Schemas (per OpenAPI)
+### Testing
+Unit for use cases; contract/integration for adapters.
 
-RegisterRequest { name?, email, password }
+## 📫 Contact
 
-LoginRequest { email, password }
-
-OAuthGoogleRequest { idToken }
-
-NewPasswordDTO { newPassword } (≥ 8, upper/lower/digit)
-
-ChangePasswordRequest { currentPassword, newPassword }
-
-ForgotPasswordRequest { email }
-
-ChangeEmailRequest { newEmail }
-
-LoginResponse / AuthResponse { accessToken }
-
-JwtResponse { token }
-
-MessageResponse { message }
-
-⚠️ Errors (typical)
-
-400 validation / expired token
-
-401 auth failure / missing session
-
-403 CSRF mismatch / provider rules
-
-409 conflicts (e.g., unconfirmed login, duplicate email)
-
-5xx internal (with logged error id)
-
-🎨 Branding (used by emails)
-
-MailBranding.brandName()
-
-MailBranding.safeLogoUrl() → absolute HTTPS image URL (fixed width/height in templates)
-
-MailBranding.frontendUrl() (for /login, /support CTAs)
-
-✉️ Email Template Guarantees
-
-Table layout (640px), inline CSS, fixed logo sizing, accessible CTA
-
-Unified header/footer (gradient: linear-gradient(135deg,#0a2239,#0e4b68))
-
-Footer ⚡ baseline fixed across Gmail/Outlook/iOS
-
-Gmail clipping mitigations (lean markup + zero-width char)
-
-📫 Contact
-
-✉️ Email: andescoresoftware@gmail.com
-
-🧰 Issues/Requests: (open an issue in the project repository)
+- ✉️ Email: andescoresoftware@gmail.com
+- Issues/Requests: open an issue in this repository
