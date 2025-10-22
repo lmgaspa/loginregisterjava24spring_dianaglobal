@@ -1,17 +1,18 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/PasswordSetEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Year;
+import com.dianaglobal.loginregister.config.MailConfig;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 
 @Slf4j
 @Component
@@ -37,16 +38,11 @@ public class PasswordSetEmailService {
 
             String html = buildHtml(name, firstDefinition);
 
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(html, true);
-            try { helper.setFrom(fromAddress, branding.brandName()); } catch (Exception ignore) { helper.setFrom(fromAddress); }
-
-            mailSender.send(message);
+            MimeMessagePreparator preparator = MailConfig.createPreparator(toEmail, subject, html, fromAddress, branding.brandName());
+            mailSender.send(preparator);
+            
             log.info("Password {} e-mail sent to {}", (firstDefinition ? "creation" : "change"), toEmail);
-        } catch (Exception e) {
+        } catch (MailSendException e) {
             log.error("Error sending password {} e-mail to {}: {}", (firstDefinition ? "creation" : "change"), toEmail, e.getMessage(), e);
         }
     }

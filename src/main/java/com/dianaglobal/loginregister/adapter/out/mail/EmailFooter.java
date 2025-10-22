@@ -24,16 +24,10 @@ public final class EmailFooter {
         
         return """
             <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                        padding:8px 18px;text-align:center;font-size:14px;line-height:1.2;">
-              <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-                <tr>
-                  <td style="text-align:center;vertical-align:middle;">
-                    <span role="img" aria-label="lightning" 
-                          style="color:#ffd200;font-size:18px;vertical-align:middle;margin-right:6px;">&#x26A1;&#xFE0E;</span>
-                    <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
-                  </td>
-                </tr>
-              </table>
+                        padding:10px 18px;text-align:center;font-size:14px;line-height:1.4;">
+              <span role="img" aria-label="lightning" 
+                    style="color:#ffd200;font-size:16px;vertical-align:baseline;margin-right:4px;">&#x26A1;&#xFE0E;</span>
+              <span style="vertical-align:baseline;">© %d · Powered by <strong>AndesCore Software</strong></span>
             </div>
             """.formatted(year);
     }
@@ -49,16 +43,10 @@ public final class EmailFooter {
         
         return """
             <tr>
-              <td style="padding:8px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1.2;">
-                <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-                  <tr>
-                    <td style="text-align:center;vertical-align:middle;">
-                      <span role="img" aria-label="lightning" 
-                            style="color:#ffd200;font-size:18px;vertical-align:middle;margin-right:6px;">&#x26A1;&#xFE0E;</span>
-                      <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
-                    </td>
-                  </tr>
-                </table>
+              <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1.4;">
+                <span role="img" aria-label="lightning" 
+                      style="color:#ffd200;font-size:16px;vertical-align:baseline;margin-right:4px;">&#x26A1;&#xFE0E;</span>
+                <span style="vertical-align:baseline;">© %d · Powered by <strong>AndesCore Software</strong></span>
               </td>
             </tr>
             """.formatted(year);

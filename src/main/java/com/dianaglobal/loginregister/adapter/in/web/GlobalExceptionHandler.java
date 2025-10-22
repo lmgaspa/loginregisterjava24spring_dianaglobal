@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.toMap(
                         fe -> fe.getField(),
                         DefaultMessageSourceResolvable::getDefaultMessage,
-                        (a, b) -> a,
+                        (a, _) -> a,
                         LinkedHashMap::new
                 ));
         Map<String, Object> body = baseBody(HttpStatus.BAD_REQUEST, "Validation failed", req);
@@ -60,7 +60,7 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.toMap(
                         v -> v.getPropertyPath().toString(),
                         v -> v.getMessage(),
-                        (a, b) -> a,
+                        (a, _) -> a,
                         LinkedHashMap::new
                 ));
         Map<String, Object> body = baseBody(HttpStatus.BAD_REQUEST, "Constraint violation", req);

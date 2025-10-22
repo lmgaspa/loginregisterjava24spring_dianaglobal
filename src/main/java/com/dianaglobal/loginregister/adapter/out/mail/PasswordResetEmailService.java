@@ -1,17 +1,16 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/PasswordResetEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Year;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Service;
 
+import com.dianaglobal.loginregister.config.MailConfig;
 import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
 
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,16 +29,11 @@ public class PasswordResetEmailService {
             String subject = branding.brandName() + " – Password Reset";
             String html = buildHtml(name, link, minutes);
 
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(html, true);
-            try { helper.setFrom(fromAddress, branding.brandName()); } catch (Exception ignore) { helper.setFrom(fromAddress); }
-
-            mailSender.send(message);
+            MimeMessagePreparator preparator = MailConfig.createPreparator(to, subject, html, fromAddress, branding.brandName());
+            mailSender.send(preparator);
+            
             log.info("Password reset e-mail sent to {}", to);
-        } catch (Exception e) {
+        } catch (MailSendException e) {
             log.error("Error sending password reset e-mail to {}: {}", to, e.getMessage(), e);
             throw new RuntimeException("Failed to send password reset e-mail", e);
         }
@@ -47,7 +41,6 @@ public class PasswordResetEmailService {
 
     private String buildHtml(String name, String link, int minutes) {
         String safeName = (name == null || name.isBlank()) ? "customer" : escapeHtml(name);
-        int year = Year.now().getValue();
         String subtitle = "Password reset";
         String logoUrl = branding.safeLogoUrl();
 
