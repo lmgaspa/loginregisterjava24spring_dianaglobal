@@ -24,7 +24,7 @@ public final class EmailFooter {
         
         return """
             <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                        padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                        padding:16px 18px;text-align:center;font-size:14px;line-height:1;">
               © %d · Powered by <strong>AndesCore Software</strong>
             </div>
             """.formatted(year);
@@ -41,7 +41,7 @@ public final class EmailFooter {
         
         return """
             <tr>
-              <td style="padding:6px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1;">
+              <td style="padding:16px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1;">
                 © %d · Powered by <strong>AndesCore Software</strong>
               </td>
             </tr>
