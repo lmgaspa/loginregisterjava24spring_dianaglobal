@@ -31,7 +31,7 @@ public class PasswordResetEmailService {
             String html = buildHtml(name, link, minutes);
 
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
@@ -56,9 +56,16 @@ public class PasswordResetEmailService {
             <html lang="en">
             <head>
               <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width"/>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
               <title>%s – Password Reset</title>
-              <style>img{display:block}</style>
+              <style>
+                img{display:block}
+                body{margin:0;padding:0;-webkit-text-size-adjust:100%%;-ms-text-size-adjust:100%%;}
+                table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}
+                td{border-collapse:collapse;}
+                p{margin:0;padding:0;}
+                a{text-decoration:none;}
+              </style>
             </head>
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px;margin:0;color:#111827;">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
@@ -93,13 +100,13 @@ public class PasswordResetEmailService {
                   <p style="margin:0 0 12px;line-height:1.55">
                     If you did not request this change, you can safely ignore this e-mail.
                   </p>
-                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all">
-                    If the button doesn’t work, copy and paste this link into your browser:<br>%s
+                  <p style="font-size:12px;color:#6b7280;margin-top:16px;word-break:break-all;white-space:normal;overflow-wrap:break-word;">
+                    If the button doesn't work, copy and paste this link into your browser:<br>%s
                   </p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="lightning" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:8px 18px;text-align:center;font-size:14px;line-height:1.4;">
+                  <span role="img" aria-label="lightning" style="color:#ffd200;font-size:18px;margin-right:6px;">&#x26A1;&#xFE0E;</span>
+                  <span>© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body>

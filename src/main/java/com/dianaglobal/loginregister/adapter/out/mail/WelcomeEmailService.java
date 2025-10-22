@@ -1,17 +1,19 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/WelcomeEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.nio.charset.StandardCharsets;
+import java.time.Year;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Year;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
+
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -29,7 +31,7 @@ public class WelcomeEmailService {
             String html = buildHtml(name);
 
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
@@ -52,8 +54,16 @@ public class WelcomeEmailService {
             <html lang="en">
             <head>
               <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width"/>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
               <title>Welcome to %s</title>
+              <style>
+                img{display:block}
+                body{margin:0;padding:0;-webkit-text-size-adjust:100%%;-ms-text-size-adjust:100%%;}
+                table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}
+                td{border-collapse:collapse;}
+                p{margin:0;padding:0;}
+                a{text-decoration:none;}
+              </style>
             </head>
             <body style="font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;padding:24px">
               <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
@@ -87,10 +97,10 @@ public class WelcomeEmailService {
                 </div>
 
                 <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                            padding:8px 18px;text-align:center;font-size:14px;line-height:1.4;">
                   <span role="img" aria-label="raio"
-                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
+                        style="color:#ffd200;font-size:18px;margin-right:6px;">&#x26A1;&#xFE0E;</span>
+                  <span>© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body>

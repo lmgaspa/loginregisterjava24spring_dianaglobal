@@ -1,17 +1,19 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/EmailChangeChangedEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.nio.charset.StandardCharsets;
+import java.time.Year;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Year;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
+
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -33,7 +35,7 @@ public class EmailChangeChangedEmailService {
     private void sendHtml(String toEmail, String subject, String html) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
@@ -57,9 +59,16 @@ public class EmailChangeChangedEmailService {
             <html lang="en">
             <head>
               <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <title>%s · %s</title>
-              <style>img{display:block}</style>
+              <style>
+                img{display:block}
+                body{margin:0;padding:0;-webkit-text-size-adjust:100%%;-ms-text-size-adjust:100%%;}
+                table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}
+                td{border-collapse:collapse;}
+                p{margin:0;padding:0;}
+                a{text-decoration:none;}
+              </style>
             </head>
             <body style="margin:0;padding:24px;background:#f6f7f9;font-family:Arial,Helvetica,sans-serif;color:#111827;">
               <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0">
@@ -127,20 +136,11 @@ public class EmailChangeChangedEmailService {
     private String footer(int year) {
         return """
             <tr>
-              <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);color:#ffffff;">
-                <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
-                  <tr>
-                    <td valign="middle" style="padding-right:8px;">
-                      <span role="img" aria-label="lightning"
-                            style="display:inline-block;font-size:20px;line-height:1;vertical-align:middle;">&#9889;&#65039;</span>
-                    </td>
-                    <td valign="middle" style="text-align:center;">
-                      <span style="display:inline-block;vertical-align:middle;font-size:13px;line-height:1.4;">
-                        © %d · Powered by <strong>AndesCore Software</strong>&#8203;
-                      </span>
-                    </td>
-                  </tr>
-                </table>
+              <td style="padding:8px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);color:#ffffff;text-align:center;">
+                <span role="img" aria-label="lightning" style="color:#ffd200;font-size:18px;margin-right:6px;">&#x26A1;&#xFE0E;</span>
+                <span style="font-size:14px;line-height:1.4;">
+                  © %d · Powered by <strong>AndesCore Software</strong>
+                </span>
               </td>
             </tr>
             """.formatted(year);
