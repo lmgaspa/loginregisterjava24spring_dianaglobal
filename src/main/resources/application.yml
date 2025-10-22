@@ -1,25 +1,12 @@
 spring:
   application:
     name: ${APPLICATION_NAME}
-    brand:
-      name: "Diana Global"
-      frontend-url: "https://www.dianaglobal.com.br"
-      logo-url: "https://www.andescoresoftware.com.br/" # troque aqui quando quiser
-
-    google:
-      oauth:
-        enabled: ${GOOGLE_OAUTH_ENABLED:false}  # defina true no Heroku quando quiser ativar
-    # GOOGLE_CLIENT_ID vem do ambiente (sem default aqui de propósito)
 
   data:
     mongodb:
       uri: ${MONGODB_URI}
       auto-index-creation: true
       uuid-representation: standard
-  # logging opcional
-  logging:
-    level:
-      org.springframework.data.mongodb: info
 
   mail:
     host: ${MAIL_HOST}
@@ -33,11 +20,26 @@ spring:
           starttls:
             enable: true
 
+logging:
+  level:
+    org.springframework.data.mongodb: info
+
+brand:
+  name: "Diana Global"
+  frontend-url: "https://www.dianaglobal.com.br"
+  logo-url: "https://www.andescoresoftware.com.br" # troque aqui quando quiser
+
+google:
+  oauth:
+    enabled: ${GOOGLE_OAUTH_ENABLED:false}  # defina true no Heroku quando quiser ativar
+    # GOOGLE_CLIENT_ID vem do ambiente (sem default aqui de propósito)
+
 application:
   jwt:
     secret: ${JWT_SECRET}
   brand:
     name: ${BRAND_NAME}
+    logo-url: "https://www.andescoresoftware.com.br/AndesCore.jpg"
   frontend:
     base-url: ${FRONTEND_BASE_URL}
   confirmation:

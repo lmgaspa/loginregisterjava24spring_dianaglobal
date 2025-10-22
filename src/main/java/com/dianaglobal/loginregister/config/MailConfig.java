@@ -1,13 +1,13 @@
 // src/main/java/com/dianaglobal/loginregister/config/MailConfig.java
 package com.dianaglobal.loginregister.config;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Properties;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 @Configuration
 public class MailConfig {
@@ -38,8 +38,8 @@ public class MailConfig {
     @Bean
     public MailBranding mailBranding(
             @Value("${application.brand.name:Diana Global}") String brandName,
-            @Value("${application.brand.frontend-url:https://www.dianaglobal.com.br}") String frontendUrl,
-            @Value("${application.brand.logo-url:https://www.andescoresoftware.com.br//AndesCore.jpg}") String logoUrl
+            @Value("${brand.frontend-url:https://www.dianaglobal.com.br}") String frontendUrl,
+            @Value("${application.brand.logo-url:https://www.andescoresoftware.com.br/AndesCore.jpg}") String logoUrl
     ) {
         return new MailBranding(brandName, frontendUrl, logoUrl);
     }

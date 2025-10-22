@@ -1,27 +1,12 @@
 package com.dianaglobal.loginregister.adapter.in.web;
 
-import com.dianaglobal.loginregister.adapter.in.dto.ApiError;
-import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
-import com.dianaglobal.loginregister.adapter.in.dto.OAuthGoogleRequest;
-import com.dianaglobal.loginregister.adapter.in.dto.ProfileResponseDTO;
-import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
-import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
-import com.dianaglobal.loginregister.adapter.in.dto.password.ChangePasswordRequest;
-import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
-import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
-import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
-import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
-import com.dianaglobal.loginregister.application.service.*;
-import com.dianaglobal.loginregister.domain.model.User;
-import com.dianaglobal.loginregister.security.CsrfTokenService;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Pattern;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.net.URI;
+import java.security.GeneralSecurityException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
@@ -34,15 +19,44 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
-import com.dianaglobal.loginregister.application.service.exception.TokenAlreadyUsedException;
-import com.dianaglobal.loginregister.application.service.exception.TokenExpiredException;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+import com.dianaglobal.loginregister.adapter.in.dto.ApiError;
+import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.OAuthGoogleRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.ProfileResponseDTO;
+import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
+import com.dianaglobal.loginregister.adapter.in.dto.password.ChangePasswordRequest;
+import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
+import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
+import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
+import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
+import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
+import com.dianaglobal.loginregister.application.service.ConfirmationResendThrottleService;
+import com.dianaglobal.loginregister.application.service.EmailChangeService;
+import com.dianaglobal.loginregister.application.service.JwtService;
+import com.dianaglobal.loginregister.application.service.RefreshTokenService;
+import com.dianaglobal.loginregister.application.service.UserService;
+import com.dianaglobal.loginregister.domain.model.User;
+import com.dianaglobal.loginregister.security.CsrfTokenService;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
-import java.net.URI;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.UUID;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
@@ -187,7 +201,7 @@ public class AuthController {
             var info = confirmationResendThrottleService.preview(user.getId(), Instant.now());
             var body = ApiError.builder()
                     .error("EMAIL_UNCONFIRMED")
-                    .message("Email não confirmado.")
+                    .message("Unconfirmed email.")
                     .canResend(info.canResend())
                     .cooldownSecondsRemaining(info.cooldownSecondsRemaining())
                     .attemptsToday(info.attemptsToday())
@@ -256,8 +270,24 @@ public class AuthController {
             exposeCsrfHeader(response, csrf);
 
             return ResponseEntity.ok(new LoginResponse(access, null));
-        } catch (Exception e) {
-            log.error("[GOOGLE OAUTH ERROR] {}", e.getMessage(), e);
+        } catch (GeneralSecurityException e) {
+            log.error("[GOOGLE OAUTH ERROR] Security error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid Google token"));
+        } catch (IOException e) {
+            log.error("[GOOGLE OAUTH ERROR] IO error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Token verification failed"));
+        } catch (IllegalArgumentException e) {
+            log.error("[GOOGLE OAUTH ERROR] Validation error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new MessageResponse(e.getMessage()));
+        } catch (DuplicateKeyException e) {
+            log.error("[GOOGLE OAUTH ERROR] Duplicate key error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new MessageResponse("Account already exists"));
+        } catch (RuntimeException e) {
+            log.error("[GOOGLE OAUTH ERROR] Runtime error: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new MessageResponse("Internal error"));
         }
@@ -265,6 +295,8 @@ public class AuthController {
 
     // ===================== SET PASSWORD =====================
     public record NewPasswordDTO(
+            @jakarta.validation.constraints.NotBlank(message = "Password cannot be blank")
+            @jakarta.validation.constraints.Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
             @jakarta.validation.constraints.Pattern(
                     regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d).{8,}$",
                     message = "Password must include at least 1 uppercase letter, 1 lowercase letter, and 1 digit and be at least 8 characters"
@@ -273,37 +305,84 @@ public class AuthController {
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping(value = "/password/set", consumes = CT_JSON, produces = CT_JSON)
-    public ResponseEntity<MessageResponse> setPassword(
+    public ResponseEntity<?> setPassword(
             @AuthenticationPrincipal UserDetails principal,
-            @RequestBody @Valid NewPasswordDTO body
+            @RequestBody @Valid NewPasswordDTO body,
+            @RequestHeader(name = "Authorization", required = false) String authHeader
     ) {
+        // Log da tentativa de alteração de senha para auditoria
+        String requestId = UUID.randomUUID().toString();
+        log.info("[PASSWORD SET REQUEST {}] Attempt to set password for user: {}", 
+                requestId, principal != null ? principal.getUsername() : "unknown");
+
+        // Verificação de autenticação
         if (principal == null) {
+            log.warn("[PASSWORD SET ERROR {}] Authentication failed - no principal", requestId);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Not authenticated"));
         }
 
-        var user = userRepositoryPort.findByEmail(principal.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        final boolean wasPasswordSetBefore = user.isPasswordSet();
-
-        user.setPassword(passwordEncoder.encode(body.newPassword()));
-        user.setPasswordSet(true);
-        userRepositoryPort.save(user);
-
         try {
-            if (!wasPasswordSetBefore) {
-                passwordSetEmailService.sendFirstDefinition(user.getEmail(), user.getName());
-            } else {
-                passwordSetEmailService.sendChange(user.getEmail(), user.getName());
+            // Buscar usuário
+            var user = userRepositoryPort.findByEmail(principal.getUsername());
+            if (user.isEmpty()) {
+                log.warn("[PASSWORD SET ERROR {}] User not found: {}", requestId, principal.getUsername());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new MessageResponse("User not found"));
             }
-        } catch (Exception ex) {
-            log.warn("[PASSWORD EMAIL WARN] {}", ex.getMessage());
-        }
 
-        return ResponseEntity.ok(new MessageResponse(
-                wasPasswordSetBefore ? "Password changed successfully" : "Password set successfully"
-        ));
+            User userEntity = user.get();
+            final boolean wasPasswordSetBefore = userEntity.isPasswordSet();
+
+            // Validar senha adicional (além da validação do Bean Validation)
+            String newPassword = body.newPassword();
+            if (newPassword == null || newPassword.trim().isEmpty()) {
+                log.warn("[PASSWORD SET ERROR {}] Empty password provided for user: {}", requestId, userEntity.getEmail());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new MessageResponse("Password cannot be empty"));
+            }
+
+            // Verificar se a nova senha é diferente da atual (se já existe)
+            if (wasPasswordSetBefore && passwordEncoder.matches(newPassword, userEntity.getPassword())) {
+                log.warn("[PASSWORD SET ERROR {}] New password same as current password for user: {}", requestId, userEntity.getEmail());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new MessageResponse("New password must be different from current password"));
+            }
+
+            // Fazer hash da nova senha
+            String hashedPassword = passwordEncoder.encode(newPassword);
+            userEntity.setPassword(hashedPassword);
+            userEntity.setPasswordSet(true);
+            userRepositoryPort.save(userEntity);
+
+            // Log de sucesso para auditoria
+            log.info("[PASSWORD SET SUCCESS {}] Password {} for user: {}", 
+                    requestId, wasPasswordSetBefore ? "changed" : "set", userEntity.getEmail());
+
+            // Enviar email de notificação
+            try {
+                if (!wasPasswordSetBefore) {
+                    passwordSetEmailService.sendFirstDefinition(userEntity.getEmail(), userEntity.getName());
+                } else {
+                    passwordSetEmailService.sendChange(userEntity.getEmail(), userEntity.getName());
+                }
+            } catch (Exception ex) {
+                log.warn("[PASSWORD SET EMAIL WARN {}] Failed to send notification email: {}", requestId, ex.getMessage());
+            }
+
+            return ResponseEntity.ok(new MessageResponse(
+                    wasPasswordSetBefore ? "Password changed successfully" : "Password set successfully"
+            ));
+
+        } catch (IllegalArgumentException e) {
+            log.error("[PASSWORD SET ERROR {}] Validation error: {}", requestId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new MessageResponse(e.getMessage()));
+        } catch (Exception e) {
+            log.error("[PASSWORD SET ERROR {}] Unexpected error: {}", requestId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Internal server error"));
+        }
     }
 
     // ===================== EMAIL CHANGE (request/confirm) =====================
