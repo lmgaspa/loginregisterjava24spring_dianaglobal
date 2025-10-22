@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
@@ -84,6 +85,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final CsrfTokenService csrfTokenService;
+    @Qualifier("passwordSetEmailService")
     private final com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService passwordSetEmailService;
     private final ConfirmationResendThrottleService confirmationResendThrottleService;
     private final EmailChangeService emailChangeService; // NEW
