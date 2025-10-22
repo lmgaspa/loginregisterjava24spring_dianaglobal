@@ -355,7 +355,7 @@ public class AuthController {
             
             // Send notification email
             try {
-                passwordSetEmailService.sendFirstDefinition(user.getEmail(), user.getName());
+                passwordSetEmailService.sendFirstDefinitionForGoogle(user.getEmail(), user.getName());
             } catch (Exception ex) {
                 log.warn("[PASSWORD SET UNAUTH EMAIL WARN {}] Failed to send notification: {}", requestId, ex.getMessage());
             }

@@ -29,45 +29,74 @@ public class PasswordSetEmailService {
      * @param toEmail recipient e-mail
      * @param name    user name (can be null/blank)
      * @param firstDefinition true = first password setup; false = password change
+     * @param isGoogleUser true = user came from Google OAuth; false = traditional user
      */
-    public void send(String toEmail, String name, boolean firstDefinition) {
+    public void send(String toEmail, String name, boolean firstDefinition, boolean isGoogleUser) {
         try {
-            String subject = firstDefinition
-                    ? "✅ Your password was created at " + branding.brandName()
-                    : "🔐 Your " + branding.brandName() + " password was changed";
-
-            String html = buildHtml(name, firstDefinition);
+            String subject = buildSubject(firstDefinition, isGoogleUser);
+            String html = buildHtml(name, firstDefinition, isGoogleUser);
 
             MimeMessagePreparator preparator = MailConfig.createPreparator(toEmail, subject, html, fromAddress, branding.brandName());
             mailSender.send(preparator);
             
-            log.info("Password {} e-mail sent to {}", (firstDefinition ? "creation" : "change"), toEmail);
+            log.info("Password {} e-mail sent to {} (Google user: {})", (firstDefinition ? "creation" : "change"), toEmail, isGoogleUser);
         } catch (MailSendException e) {
             log.error("Error sending password {} e-mail to {}: {}", (firstDefinition ? "creation" : "change"), toEmail, e.getMessage(), e);
         }
     }
 
+    /**
+     * Legacy method for backward compatibility.
+     */
+    public void send(String toEmail, String name, boolean firstDefinition) {
+        send(toEmail, name, firstDefinition, false);
+    }
+
     public void sendFirstDefinition(String toEmail, String name) { send(toEmail, name, true); }
     public void sendChange(String toEmail, String name) { send(toEmail, name, false); }
+    
+    public void sendFirstDefinitionForGoogle(String toEmail, String name) { send(toEmail, name, true, true); }
 
-    private String buildHtml(String name, boolean firstDefinition) {
+    private String buildSubject(boolean firstDefinition, boolean isGoogleUser) {
+        if (firstDefinition && isGoogleUser) {
+            return "🎉 Your account is now complete! - " + branding.brandName();
+        } else if (firstDefinition) {
+            return "✅ Your password was created at " + branding.brandName();
+        } else {
+            return "🔐 Your " + branding.brandName() + " password was changed";
+        }
+    }
+
+    private String buildHtml(String name, boolean firstDefinition, boolean isGoogleUser) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
 
-        String title = firstDefinition ? "Password created" : "Password changed";
-        String lead  = firstDefinition ? "Your password has been successfully created "
-                : "Your password has been successfully changed ";
-        String sub   = firstDefinition
-                ? "From now on, you can sign in using your e-mail and this password (besides Google Login)."
-                : "If this change wasn't made by you, please reset your password immediately.";
+        String title, lead, sub, actionHref, actionLabel, advisory;
 
-        String actionHref = firstDefinition
-                ? branding.frontendUrl() + "/login"
-                : branding.frontendUrl() + "/forgot-password";
-        String actionLabel = firstDefinition ? "Access your account" : "Reset your password";
-
-        String advisory = firstDefinition
-                ? "If you didn't request this, we recommend changing your password."
-                : "Security tip: enable 2FA in your account settings when available.";
+        if (firstDefinition && isGoogleUser) {
+            // Special message for Google users completing their account
+            title = "Account Complete";
+            lead = "Your account has been successfully created and is now 100% configured";
+            sub = "You can now sign in using both Google and your email/password combination. Your account is ready for full use!";
+            actionHref = branding.frontendUrl() + "/dashboard";
+            actionLabel = "Access your account";
+            advisory = "Welcome to " + branding.brandName() + "! If you didn't request this, please contact support immediately.";
+        } else if (firstDefinition) {
+            // Traditional user password creation
+            title = "Password created";
+            lead = "Your password has been successfully created";
+            sub = "From now on, you can sign in using your e-mail and this password (besides Google Login).";
+            actionHref = branding.frontendUrl() + "/login";
+            actionLabel = "Access your account";
+            advisory = "If you didn't request this, we recommend changing your password.";
+        } else {
+            // Password change
+            title = "Password changed";
+            lead = "Your password has been successfully changed";
+            sub = "If this change wasn't made by you, please reset your password immediately.";
+            actionHref = branding.frontendUrl() + "/forgot-password";
+            actionLabel = "Reset your password";
+            advisory = "Security tip: enable 2FA in your account settings when available.";
+        }
 
         String logoUrl = branding.safeLogoUrl();
 
@@ -98,7 +127,7 @@ public class PasswordSetEmailService {
                       <td style="text-align:right;vertical-align:middle;">
                         <div style="font-weight:700;font-size:18px;line-height:1;"><strong>%s</strong></div>
                         <div style="height:6px;line-height:6px;font-size:0;">&nbsp;</div>
-                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">Account security notice</div>
+                        <div style="opacity:.9;font-size:12px;line-height:1.2;margin-top:4px;">%s</div>
                       </td>
                     </tr>
                   </table>
@@ -125,6 +154,7 @@ public class PasswordSetEmailService {
                 logoUrl,                    // header logo src
                 branding.brandName(),       // header logo alt
                 branding.brandName(),       // header brand text
+                isGoogleUser && firstDefinition ? "Welcome!" : "Account security notice", // header subtitle
                 safeName,                   // Hello, X
                 lead,                       // "Password created/changed ..."
                 branding.brandName(),       // "... at BRAND"
@@ -135,6 +165,7 @@ public class PasswordSetEmailService {
                 EmailFooter.generate()      // footer
         );
     }
+
 
     private static String escapeHtml(String s) {
         return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
