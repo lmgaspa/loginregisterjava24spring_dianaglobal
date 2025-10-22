@@ -46,7 +46,6 @@ public class WelcomeEmailService {
 
     private String buildHtml(String name) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
-        int year = Year.now().getValue();
         String logoUrl = branding.safeLogoUrl();
 
         return """
@@ -96,12 +95,7 @@ public class WelcomeEmailService {
                   </p>
                 </div>
 
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:8px 18px;text-align:center;font-size:14px;line-height:1.4;">
-                  <span role="img" aria-label="raio"
-                        style="color:#ffd200;font-size:18px;margin-right:6px;">&#x26A1;&#xFE0E;</span>
-                  <span>© %d · Powered by <strong>AndesCore Software</strong></span>
-                </div>
+                %s
               </div>
             </body>
             </html>
@@ -113,7 +107,7 @@ public class WelcomeEmailService {
                 safeName,
                 branding.brandName(),
                 branding.frontendUrl(),
-                year
+                EmailFooter.generate()
         );
     }
 

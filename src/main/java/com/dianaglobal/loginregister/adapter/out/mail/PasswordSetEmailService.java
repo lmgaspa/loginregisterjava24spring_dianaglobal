@@ -56,7 +56,6 @@ public class PasswordSetEmailService {
 
     private String buildHtml(String name, boolean firstDefinition) {
         String safeName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
-        int year = Year.now().getValue();
 
         String title = firstDefinition ? "Password created" : "Password changed";
         String lead  = firstDefinition ? "Your password has been successfully created "
@@ -120,12 +119,7 @@ public class PasswordSetEmailService {
                   </p>
                   <p style="margin:0 0 12px;line-height:1.55;color:#374151">%s</p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="raio"
-                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
-                </div>
+                %s
               </div>
             </body>
             </html>
@@ -142,7 +136,7 @@ public class PasswordSetEmailService {
                 actionHref,                 // CTA href
                 actionLabel,                // CTA label
                 advisory,                   // extra advisory
-                year                        // © year
+                EmailFooter.generate()      // footer
         );
     }
 
