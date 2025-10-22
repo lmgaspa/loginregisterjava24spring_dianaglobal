@@ -26,8 +26,8 @@ public final class EmailFooter {
             <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
                         padding:10px 18px;text-align:center;font-size:14px;line-height:1.4;">
               <span role="img" aria-label="lightning" 
-                    style="color:#ffd200;font-size:16px;vertical-align:baseline;margin-right:4px;">&#x26A1;&#xFE0E;</span>
-              <span style="vertical-align:baseline;">© %d · Powered by <strong>AndesCore Software</strong></span>
+                    style="color:#ffd200;font-size:16px;vertical-align:middle;margin-right:4px;">&#x26A1;&#xFE0E;</span>
+              <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
             </div>
             """.formatted(year);
     }
@@ -45,8 +45,8 @@ public final class EmailFooter {
             <tr>
               <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1.4;">
                 <span role="img" aria-label="lightning" 
-                      style="color:#ffd200;font-size:16px;vertical-align:baseline;margin-right:4px;">&#x26A1;&#xFE0E;</span>
-                <span style="vertical-align:baseline;">© %d · Powered by <strong>AndesCore Software</strong></span>
+                      style="color:#ffd200;font-size:16px;vertical-align:middle;margin-right:4px;">&#x26A1;&#xFE0E;</span>
+                <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
               </td>
             </tr>
             """.formatted(year);
