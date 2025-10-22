@@ -1,17 +1,19 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/PasswordResetEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.nio.charset.StandardCharsets;
+import java.time.Year;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Year;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
+
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -95,11 +97,9 @@ public class PasswordResetEmailService {
                     If the button doesn’t work, copy and paste this link into your browser:<br>%s
                   </p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
-                  <span role="img" aria-label="lightning"
-                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
-                  <span style="vertical-align:middle;">&nbsp;© %d · Powered by <strong>AndesCore Software</strong>&#8203;</span>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="lightning" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body>
