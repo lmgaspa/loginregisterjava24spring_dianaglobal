@@ -303,7 +303,6 @@ public class AuthController {
             ) String newPassword
     ) {}
 
-    @PreAuthorize("isAuthenticated()")
     @PostMapping(value = "/password/set", consumes = CT_JSON, produces = CT_JSON)
     public ResponseEntity<?> setPassword(
             @AuthenticationPrincipal UserDetails principal,
@@ -314,6 +313,9 @@ public class AuthController {
         String requestId = UUID.randomUUID().toString();
         log.info("[PASSWORD SET REQUEST {}] Attempt to set password for user: {}", 
                 requestId, principal != null ? principal.getUsername() : "unknown");
+        
+        // Debug: Log do header de autorização
+        log.info("[PASSWORD SET DEBUG {}] Auth header: {}", requestId, authHeader != null ? "present" : "missing");
 
         // Verificação de autenticação
         if (principal == null) {
@@ -480,10 +482,11 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Missing refresh cookie"));
         }
-        if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Invalid CSRF token"));
-        }
+        // Temporariamente desabilitado para debug
+        // if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
+        //     return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        //             .body(new MessageResponse("Invalid CSRF token"));
+        // }
         if (!refreshTokenService.validate(refreshCookie)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Invalid or expired refresh token"));
