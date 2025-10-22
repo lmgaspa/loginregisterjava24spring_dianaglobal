@@ -317,18 +317,32 @@ public class AuthController {
         // Debug: Log do header de autorização
         log.info("[PASSWORD SET DEBUG {}] Auth header: {}", requestId, authHeader != null ? "present" : "missing");
 
+        // Extrair email do token JWT se principal for null
+        String userEmail = null;
+        if (principal != null) {
+            userEmail = principal.getUsername();
+        } else if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                String token = authHeader.substring(7);
+                userEmail = jwtService.extractEmail(token);
+                log.info("[PASSWORD SET DEBUG {}] Extracted email from token: {}", requestId, userEmail);
+            } catch (Exception e) {
+                log.warn("[PASSWORD SET ERROR {}] Failed to extract email from token: {}", requestId, e.getMessage());
+            }
+        }
+
         // Verificação de autenticação
-        if (principal == null) {
-            log.warn("[PASSWORD SET ERROR {}] Authentication failed - no principal", requestId);
+        if (userEmail == null || userEmail.isBlank()) {
+            log.warn("[PASSWORD SET ERROR {}] Authentication failed - no valid user email", requestId);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Not authenticated"));
         }
 
         try {
             // Buscar usuário
-            var user = userRepositoryPort.findByEmail(principal.getUsername());
+            var user = userRepositoryPort.findByEmail(userEmail);
             if (user.isEmpty()) {
-                log.warn("[PASSWORD SET ERROR {}] User not found: {}", requestId, principal.getUsername());
+                log.warn("[PASSWORD SET ERROR {}] User not found: {}", requestId, userEmail);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new MessageResponse("User not found"));
             }
