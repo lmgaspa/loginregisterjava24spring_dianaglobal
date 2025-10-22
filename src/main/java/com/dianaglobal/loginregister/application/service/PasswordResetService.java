@@ -2,6 +2,7 @@
 package com.dianaglobal.loginregister.application.service;
 
 import com.dianaglobal.loginregister.adapter.out.mail.PasswordResetEmailService;
+import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
 import com.dianaglobal.loginregister.adapter.out.persistence.PasswordResetTokenRepository;
 import com.dianaglobal.loginregister.adapter.out.persistence.entity.PasswordResetTokenEntity;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
@@ -26,6 +27,7 @@ public class PasswordResetService {
     private final UserRepositoryPort userRepo;
     private final PasswordResetTokenRepository tokenRepo;
     private final PasswordResetEmailService emailService;
+    private final PasswordSetEmailService passwordSetEmailService;
     private final PasswordEncoder passwordEncoder;
 
     /** Create a reset link: random token, store only SHA-256 hash, send e-mail. */
@@ -82,6 +84,16 @@ public class PasswordResetService {
 
         entity.setUsedAt(new Date());
         tokenRepo.save(entity);
+        
+        // Send confirmation email after successful password reset
+        try {
+            User user = userRepo.findById(entity.getUserId())
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            passwordSetEmailService.sendChange(user.getEmail(), user.getName());
+        } catch (Exception e) {
+            // Log error but don't fail the reset process
+            System.err.println("Failed to send password reset confirmation email: " + e.getMessage());
+        }
         // Alternatively: tokenRepo.deleteById(entity.getId());
     }
 
