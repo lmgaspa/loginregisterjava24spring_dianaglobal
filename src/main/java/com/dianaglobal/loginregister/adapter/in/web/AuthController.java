@@ -37,7 +37,6 @@ import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.password.ChangePasswordRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
-import com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
 import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
@@ -85,7 +84,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final CsrfTokenService csrfTokenService;
-    private final PasswordSetEmailService passwordSetEmailService;
+    private final com.dianaglobal.loginregister.adapter.out.mail.PasswordSetEmailService passwordSetEmailService;
     private final ConfirmationResendThrottleService confirmationResendThrottleService;
     private final EmailChangeService emailChangeService; // NEW
 
@@ -293,15 +292,6 @@ public class AuthController {
         }
     }
 
-    // ===================== SET PASSWORD =====================
-    public record NewPasswordDTO(
-            @jakarta.validation.constraints.NotBlank(message = "Password cannot be blank")
-            @jakarta.validation.constraints.Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
-            @jakarta.validation.constraints.Pattern(
-                    regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d).{8,}$",
-                    message = "Password must include at least 1 uppercase letter, 1 lowercase letter, and 1 digit and be at least 8 characters"
-            ) String newPassword
-    ) {}
 
     // ===================== SET PASSWORD UNAUTHENTICATED (Google Auth Users) =====================
     public record SetPasswordUnauthenticatedRequest(
@@ -318,103 +308,6 @@ public class AuthController {
             String newPassword
     ) {}
 
-    @PostMapping(value = "/password/set", consumes = CT_JSON, produces = CT_JSON)
-    public ResponseEntity<?> setPassword(
-            @AuthenticationPrincipal UserDetails principal,
-            @RequestBody @Valid NewPasswordDTO body,
-            @RequestHeader(name = "Authorization", required = false) String authHeader
-    ) {
-        // Log da tentativa de alteração de senha para auditoria
-        String requestId = UUID.randomUUID().toString();
-        log.info("[PASSWORD SET REQUEST {}] Attempt to set password for user: {}", 
-                requestId, principal != null ? principal.getUsername() : "unknown");
-        
-        // Debug: Log do header de autorização
-        log.info("[PASSWORD SET DEBUG {}] Auth header: {}", requestId, authHeader != null ? "present" : "missing");
-
-        // Extrair email do token JWT se principal for null
-        String userEmail = null;
-        if (principal != null) {
-            userEmail = principal.getUsername();
-        } else if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            try {
-                String token = authHeader.substring(7);
-                userEmail = jwtService.extractEmail(token);
-                log.info("[PASSWORD SET DEBUG {}] Extracted email from token: {}", requestId, userEmail);
-            } catch (Exception e) {
-                log.warn("[PASSWORD SET ERROR {}] Failed to extract email from token: {}", requestId, e.getMessage());
-            }
-        }
-
-        // Verificação de autenticação
-        if (userEmail == null || userEmail.isBlank()) {
-            log.warn("[PASSWORD SET ERROR {}] Authentication failed - no valid user email", requestId);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Not authenticated"));
-        }
-
-        try {
-            // Buscar usuário
-            var user = userRepositoryPort.findByEmail(userEmail);
-            if (user.isEmpty()) {
-                log.warn("[PASSWORD SET ERROR {}] User not found: {}", requestId, userEmail);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(new MessageResponse("User not found"));
-            }
-
-            User userEntity = user.get();
-            final boolean wasPasswordSetBefore = userEntity.isPasswordSet();
-
-            // Validar senha adicional (além da validação do Bean Validation)
-            String newPassword = body.newPassword();
-            if (newPassword == null || newPassword.trim().isEmpty()) {
-                log.warn("[PASSWORD SET ERROR {}] Empty password provided for user: {}", requestId, userEntity.getEmail());
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new MessageResponse("Password cannot be empty"));
-            }
-
-            // Verificar se a nova senha é diferente da atual (se já existe)
-            if (wasPasswordSetBefore && passwordEncoder.matches(newPassword, userEntity.getPassword())) {
-                log.warn("[PASSWORD SET ERROR {}] New password same as current password for user: {}", requestId, userEntity.getEmail());
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new MessageResponse("New password must be different from current password"));
-            }
-
-            // Fazer hash da nova senha
-            String hashedPassword = passwordEncoder.encode(newPassword);
-            userEntity.setPassword(hashedPassword);
-            userEntity.setPasswordSet(true);
-            userRepositoryPort.save(userEntity);
-
-            // Log de sucesso para auditoria
-            log.info("[PASSWORD SET SUCCESS {}] Password {} for user: {}", 
-                    requestId, wasPasswordSetBefore ? "changed" : "set", userEntity.getEmail());
-
-            // Enviar email de notificação
-            try {
-                if (!wasPasswordSetBefore) {
-                    passwordSetEmailService.sendFirstDefinition(userEntity.getEmail(), userEntity.getName());
-                } else {
-                    passwordSetEmailService.sendChange(userEntity.getEmail(), userEntity.getName());
-                }
-            } catch (Exception ex) {
-                log.warn("[PASSWORD SET EMAIL WARN {}] Failed to send notification email: {}", requestId, ex.getMessage());
-            }
-
-            return ResponseEntity.ok(new MessageResponse(
-                    wasPasswordSetBefore ? "Password changed successfully" : "Password set successfully"
-            ));
-
-        } catch (IllegalArgumentException e) {
-            log.error("[PASSWORD SET ERROR {}] Validation error: {}", requestId, e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new MessageResponse(e.getMessage()));
-        } catch (Exception e) {
-            log.error("[PASSWORD SET ERROR {}] Unexpected error: {}", requestId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new MessageResponse("Internal server error"));
-        }
-    }
 
     // ===================== SET PASSWORD UNAUTHENTICATED (Google Auth Users) =====================
     @PostMapping(value = "/password/set-unauthenticated", consumes = CT_JSON, produces = CT_JSON)
