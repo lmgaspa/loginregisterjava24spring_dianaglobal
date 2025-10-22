@@ -120,9 +120,11 @@ public class PasswordSetEmailService {
                   </p>
                   <p style="margin:0 0 12px;line-height:1.55;color:#374151">%s</p>
                 </div>
-                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;padding:8px 18px;text-align:center;font-size:14px;line-height:1.4;">
-                  <span role="img" aria-label="bolt" style="color:#ffd200;font-size:18px;margin-right:6px;">&#x26A1;&#xFE0E;</span>
-                  <span>© %d · Powered by <strong>AndesCore Software</strong></span>
+                <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
+                            padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+                  <span role="img" aria-label="raio"
+                        style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                  <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
                 </div>
               </div>
             </body>

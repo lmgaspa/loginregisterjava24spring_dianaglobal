@@ -1,17 +1,19 @@
 // src/main/java/com/dianaglobal/loginregister/adapter/out/mail/EmailChangeAlertOldEmailService.java
 package com.dianaglobal.loginregister.adapter.out.mail;
 
-import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.nio.charset.StandardCharsets;
+import java.time.Year;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Year;
+import com.dianaglobal.loginregister.config.MailConfig.MailBranding;
+
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -33,7 +35,7 @@ public class EmailChangeAlertOldEmailService {
     private void sendHtml(String toEmail, String subject, String html) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(html, true);
@@ -129,20 +131,9 @@ public class EmailChangeAlertOldEmailService {
     private String footer(int year) {
         return """
             <tr>
-              <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);color:#ffffff;">
-                <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
-                  <tr>
-                    <td valign="middle" style="padding-right:8px;">
-                      <span role="img" aria-label="lightning"
-                            style="display:inline-block;font-size:20px;line-height:1;vertical-align:middle;">&#9889;&#65039;</span>
-                    </td>
-                    <td valign="middle" style="text-align:center;">
-                      <span style="display:inline-block;vertical-align:middle;font-size:13px;line-height:1.4;">
-                        © %d · Powered by <strong>AndesCore Software</strong>&#8203;
-                      </span>
-                    </td>
-                  </tr>
-                </table>
+              <td style="padding:6px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1;">
+                <span role="img" aria-label="raio" style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
               </td>
             </tr>
             """.formatted(year);
