@@ -24,10 +24,10 @@ public final class EmailFooter {
         
         return """
             <div style="background:linear-gradient(135deg,#0a2239,#0e4b68);color:#fff;
-                        padding:10px 18px;text-align:center;font-size:14px;line-height:1.4;">
-              <span role="img" aria-label="lightning" 
-                    style="color:#ffd200;font-size:16px;vertical-align:text-bottom;margin-right:4px;">&#x26A1;&#xFE0E;</span>
-              <span style="vertical-align:text-bottom;">© %d · Powered by <strong>AndesCore Software</strong></span>
+                        padding:6px 18px;text-align:center;font-size:14px;line-height:1;">
+              <span role="img" aria-label="raio" 
+                    style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+              <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
             </div>
             """.formatted(year);
     }
@@ -43,10 +43,10 @@ public final class EmailFooter {
         
         return """
             <tr>
-              <td style="padding:10px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1.4;">
-                <span role="img" aria-label="lightning" 
-                      style="color:#ffd200;font-size:16px;vertical-align:text-bottom;margin-right:4px;">&#x26A1;&#xFE0E;</span>
-                <span style="vertical-align:text-bottom;">© %d · Powered by <strong>AndesCore Software</strong></span>
+              <td style="padding:6px 18px;background:linear-gradient(135deg,#0a2239,#0e4b68);text-align:center;color:#ffffff;font-size:14px;line-height:1;">
+                <span role="img" aria-label="raio" 
+                      style="color:#ffd200;font-size:22px;vertical-align:middle;">&#x26A1;&#xFE0E;</span>
+                <span style="vertical-align:middle;">© %d · Powered by <strong>AndesCore Software</strong></span>
               </td>
             </tr>
             """.formatted(year);
