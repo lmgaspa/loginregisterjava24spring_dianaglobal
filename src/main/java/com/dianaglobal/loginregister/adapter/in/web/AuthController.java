@@ -303,6 +303,21 @@ public class AuthController {
             ) String newPassword
     ) {}
 
+    // ===================== SET PASSWORD UNAUTHENTICATED (Google Auth Users) =====================
+    public record SetPasswordUnauthenticatedRequest(
+            @jakarta.validation.constraints.NotBlank(message = "Email is required")
+            @jakarta.validation.constraints.Email(message = "Invalid email format")
+            String email,
+            
+            @jakarta.validation.constraints.NotBlank(message = "Password cannot be blank")
+            @jakarta.validation.constraints.Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+            @jakarta.validation.constraints.Pattern(
+                    regexp = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d).{8,}$",
+                    message = "Password must include at least 1 uppercase letter, 1 lowercase letter, and 1 digit and be at least 8 characters"
+            )
+            String newPassword
+    ) {}
+
     @PostMapping(value = "/password/set", consumes = CT_JSON, produces = CT_JSON)
     public ResponseEntity<?> setPassword(
             @AuthenticationPrincipal UserDetails principal,
@@ -396,6 +411,64 @@ public class AuthController {
                     .body(new MessageResponse(e.getMessage()));
         } catch (Exception e) {
             log.error("[PASSWORD SET ERROR {}] Unexpected error: {}", requestId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Internal server error"));
+        }
+    }
+
+    // ===================== SET PASSWORD UNAUTHENTICATED (Google Auth Users) =====================
+    @PostMapping(value = "/password/set-unauthenticated", consumes = CT_JSON, produces = CT_JSON)
+    public ResponseEntity<?> setPasswordUnauthenticated(
+            @RequestBody @Valid SetPasswordUnauthenticatedRequest request
+    ) {
+        String requestId = UUID.randomUUID().toString();
+        log.info("[PASSWORD SET UNAUTH REQUEST {}] Attempt to set password for email: {}", 
+                requestId, request.email());
+        
+        try {
+            // Find user by email
+            var userOpt = userRepositoryPort.findByEmail(request.email().trim().toLowerCase());
+            if (userOpt.isEmpty()) {
+                log.warn("[PASSWORD SET UNAUTH ERROR {}] User not found: {}", requestId, request.email());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new MessageResponse("User not found"));
+            }
+            
+            User user = userOpt.get();
+            
+            // Validate user is Google Auth and doesn't have password set
+            if (!"GOOGLE".equalsIgnoreCase(user.getAuthProvider())) {
+                log.warn("[PASSWORD SET UNAUTH ERROR {}] User is not Google Auth: {}", requestId, user.getEmail());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new MessageResponse("This endpoint is only for Google Auth users"));
+            }
+            
+            if (user.isPasswordSet()) {
+                log.warn("[PASSWORD SET UNAUTH ERROR {}] User already has password set: {}", requestId, user.getEmail());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new MessageResponse("User already has password set"));
+            }
+            
+            // Set new password
+            String hashedPassword = passwordEncoder.encode(request.newPassword());
+            user.setPassword(hashedPassword);
+            user.setPasswordSet(true);
+            userRepositoryPort.save(user);
+            
+            log.info("[PASSWORD SET UNAUTH SUCCESS {}] Password set for Google Auth user: {}", 
+                    requestId, user.getEmail());
+            
+            // Send notification email
+            try {
+                passwordSetEmailService.sendFirstDefinition(user.getEmail(), user.getName());
+            } catch (Exception ex) {
+                log.warn("[PASSWORD SET UNAUTH EMAIL WARN {}] Failed to send notification: {}", requestId, ex.getMessage());
+            }
+            
+            return ResponseEntity.ok(new MessageResponse("Password set successfully"));
+            
+        } catch (Exception e) {
+            log.error("[PASSWORD SET UNAUTH ERROR {}] Unexpected error: {}", requestId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new MessageResponse("Internal server error"));
         }
