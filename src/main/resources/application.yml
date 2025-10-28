@@ -36,12 +36,12 @@ google:
 
 application:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:mySecretKeyForJWTTokenGeneration1234567890}
   brand:
-    name: ${BRAND_NAME}
+    name: ${BRAND_NAME:Diana Global}
     logo-url: "https://www.andescoresoftware.com.br/AndesCore.jpg"
   frontend:
-    base-url: ${FRONTEND_BASE_URL}
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   confirmation:
     minutes: 45            # expiração do token
     cooldown-seconds: 60   # intervalo mínimo entre reenvios
