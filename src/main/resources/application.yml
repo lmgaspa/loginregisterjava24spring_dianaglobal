@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: ${APPLICATION_NAME}
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+      auto-index-creation: true
+      uuid-representation: standard
+
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+logging:
+  level:
+    org.springframework.data.mongodb: info
+
+brand:
+  name: "Diana Global"
+  frontend-url: "https://www.dianaglobal.com.br"
+  logo-url: "https://www.andescoresoftware.com.br" # troque aqui quando quiser
+
+google:
+  oauth:
+    enabled: ${GOOGLE_OAUTH_ENABLED:false}  # defina true no Heroku quando quiser ativar
+    # GOOGLE_CLIENT_ID vem do ambiente (sem default aqui de propósito)
+
+application:
+  jwt:
+    secret: ${JWT_SECRET}
+  brand:
+    name: ${BRAND_NAME}
+    logo-url: "https://www.andescoresoftware.com.br/AndesCore.jpg"
+  frontend:
+    base-url: ${FRONTEND_BASE_URL}
+  confirmation:
+    minutes: 45            # expiração do token
+    cooldown-seconds: 60   # intervalo mínimo entre reenvios
+    max-per-day: 5         # teto diário por dia
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger
+    display-request-duration: true
+    try-it-out-enabled: true

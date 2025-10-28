@@ -1,0 +1,146 @@
+Listagem de caminhos de pasta
+O número de série do volume é F0CD-C046
+C:\USERS\LUHMG\DESKTOP\DEVPROFISSIONAL\DIANAGLOBAL_REGISTER_LOGIN_SPRING\LOGINREGISTER\SRC
++---main
+|   +---java
+|   |   \---com
+|   |       \---dianaglobal
+|   |           \---loginregister
+|   |               |   LoginRegisterApplication.java
+|   |               |   
+|   |               +---adapter
+|   |               |   +---in
+|   |               |   |   +---dto
+|   |               |   |   |   |   AuthResponse.java
+|   |               |   |   |   |   GenericTokenDTO.java
+|   |               |   |   |   |   JwtResponse.java
+|   |               |   |   |   |   LogoutRequestDTO.java
+|   |               |   |   |   |   OAuthGoogleRequest.java
+|   |               |   |   |   |   ProfileResponseDTO.java
+|   |               |   |   |   |   RefreshRequestDTO.java
+|   |               |   |   |   |   
+|   |               |   |   |   +---login
+|   |               |   |   |   |       LoginRequest.java
+|   |               |   |   |   |       LoginResponse.java
+|   |               |   |   |   |       
+|   |               |   |   |   \---password
+|   |               |   |   |           ForgotPasswordRequest.java
+|   |               |   |   |           RegisterRequest.java
+|   |               |   |   |           ResetPasswordRequest.java
+|   |               |   |   |           
+|   |               |   |   \---web
+|   |               |   |           AccountConfirmationController.java
+|   |               |   |           AuthController.java
+|   |               |   |           GlobalExceptionHandler.java
+|   |               |   |           PasswordResetController.java
+|   |               |   |           UserController.java
+|   |               |   |           
+|   |               |   \---out
+|   |               |       +---mail
+|   |               |       |       AccountConfirmationEmailService.java
+|   |               |       |       PasswordResetEmailService.java
+|   |               |       |       PasswordSetEmailService.java
+|   |               |       |       WelcomeEmailService.java
+|   |               |       |       
+|   |               |       \---persistence
+|   |               |           |   AccountConfirmationTokenRepository.java
+|   |               |           |   AccountConfirmationTokenServiceImpl.java
+|   |               |           |   BlacklistedTokenRepository.java
+|   |               |           |   JpaUserRepository.java
+|   |               |           |   PasswordResetTokenRepository.java
+|   |               |           |   RefreshTokenRepository.java
+|   |               |           |   
+|   |               |           \---entity
+|   |               |                   AccountConfirmationTokenEntity.java
+|   |               |                   PasswordResetTokenEntity.java
+|   |               |                   RefreshTokenEntity.java
+|   |               |                   SpringUserRepository.java
+|   |               |                   UserEntity.java
+|   |               |                   
+|   |               +---application
+|   |               |   +---event
+|   |               |   |       UserConfirmedListener.java
+|   |               |   |       WelcomeEmailOnConfirm.java
+|   |               |   |       
+|   |               |   +---port
+|   |               |   |   +---in
+|   |               |   |   |       RegisterUserUseCase.java
+|   |               |   |   |       
+|   |               |   |   \---out
+|   |               |   |           UserRepositoryPort.java
+|   |               |   |           
+|   |               |   \---service
+|   |               |       |   AccountConfirmationService.java
+|   |               |       |   AccountConfirmationTokenService.java
+|   |               |       |   JwtService.java
+|   |               |       |   PasswordResetService.java
+|   |               |       |   RefreshTokenService.java
+|   |               |       |   RegisterUserService.java
+|   |               |       |   TokenBlacklistService.java
+|   |               |       |   UserService.java
+|   |               |       |   
+|   |               |       \---exception
+|   |               |               EmailAlreadyUsedException.java
+|   |               |               
+|   |               +---config
+|   |               |       GoogleVerifierConfig.java
+|   |               |       JwtAuthenticationFilter.java
+|   |               |       SecurityConfig.java
+|   |               |       SwaggerConfig.java
+|   |               |       TtlIndexRepair.java
+|   |               |       UserConfig.java
+|   |               |       
+|   |               +---consent
+|   |               |   +---adapter
+|   |               |   |   +---in
+|   |               |   |   |   \---web
+|   |               |   |   |           ConsentCategoriesDTO.java
+|   |               |   |   |           ConsentPayloadDTO.java
+|   |               |   |   |           PrivacyController.java
+|   |               |   |   |           
+|   |               |   |   \---out
+|   |               |   |       \---mongo
+|   |               |   |               ConsentPersistenceAdapter.java
+|   |               |   |               CookieConsentDocument.java
+|   |               |   |               CookieConsentMongoMapper.java
+|   |               |   |               CookieConsentMongoRepository.java
+|   |               |   |               
+|   |               |   +---application
+|   |               |   |       CookieConsentService.java
+|   |               |   |       
+|   |               |   +---domain
+|   |               |   |       ConsentCategories.java
+|   |               |   |       ConsentDecision.java
+|   |               |   |       CookieConsent.java
+|   |               |   |       
+|   |               |   \---port
+|   |               |       +---in
+|   |               |       |       LogConsentUseCase.java
+|   |               |       |       
+|   |               |       \---out
+|   |               |               ListConsentLogsPort.java
+|   |               |               SaveConsentLogPort.java
+|   |               |               
+|   |               +---domain
+|   |               |   \---model
+|   |               |           BlacklistedToken.java
+|   |               |           User.java
+|   |               |           
+|   |               \---security
+|   |                       CookieUtils.java
+|   |                       CsrfTokenService.java
+|   |                       
+|   \---resources
+|       |   application.yml
+|       |   
+|       \---static
+|           \---images
+|                   logo-andescore.jpeg
+|                   
+\---test
+    \---java
+        \---com
+            \---dianaglobal
+                \---loginregister
+                        LoginregisterApplicationTests.java
+                        
