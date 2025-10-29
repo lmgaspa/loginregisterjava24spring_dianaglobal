@@ -465,10 +465,10 @@ public class AuthController {
                     .body(new MessageResponse("Missing refresh cookie"));
         }
         // Temporariamente desabilitado para debug
-        // if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
-        //     return ResponseEntity.status(HttpStatus.FORBIDDEN)
-        //             .body(new MessageResponse("Invalid CSRF token"));
-        // }
+         if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Invalid CSRF token"));
+        }
         if (!refreshTokenService.validate(refreshCookie)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Invalid or expired refresh token"));
@@ -494,20 +494,23 @@ public class AuthController {
                     regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
                     message = "E-mail must contain a valid domain")
             String email) {
-
-        String normalized = email.trim().toLowerCase();
-        return userService.findByEmail(normalized)
-                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new MessageResponse("User found: " + u.getEmail())))
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(new MessageResponse("User not found")));
+        // Sempre retorno uniforme para não revelar existência
+        return ResponseEntity.ok(new MessageResponse("Request processed"));
     }
+
 
     // ===================== LOGOUT =====================
     @PostMapping(value = "/logout", produces = CT_JSON)
     public ResponseEntity<MessageResponse> logout(
             @CookieValue(name = COOKIE_REFRESH, required = false) String refreshCookie,
+            @CookieValue(name = COOKIE_CSRF, required = false) String csrfCookie,
+            @RequestHeader(name = HDR_CSRF, required = false) String csrfHeader,
             HttpServletResponse response
     ) {
+        if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Invalid CSRF token"));
+        }
         if (refreshCookie != null && !refreshCookie.isBlank()) {
             try {
                 refreshTokenService.revokeToken(refreshCookie);
@@ -552,12 +555,11 @@ public class AuthController {
             String email
     ) {
         String normalized = email.trim().toLowerCase();
-        return userRepositoryPort.findByEmail(normalized)
-                .map(user -> ResponseEntity.ok(new MessageResponse(
-                        user.isEmailConfirmed() ? "confirmed" : "not_confirmed"
-                )))
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(new MessageResponse("User not found")));
+        return ResponseEntity.ok(new MessageResponse(
+                userRepositoryPort.findByEmail(normalized)
+                        .map(u -> u.isEmailConfirmed() ? "confirmed" : "not_confirmed")
+                        .orElse("unknown")
+        ));
     }
 
     // ===================== Confirmar conta (GET/POST) =====================

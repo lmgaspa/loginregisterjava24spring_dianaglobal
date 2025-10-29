@@ -24,6 +24,7 @@ public class GoogleVerifierConfig {
         return new GoogleIdTokenVerifier
                 .Builder(new NetHttpTransport(), new GsonFactory())
                 .setAudience(Collections.singletonList(clientId))
+                .setIssuers(java.util.List.of("https://accounts.google.com", "accounts.google.com"))
                 .build();
     }
 }

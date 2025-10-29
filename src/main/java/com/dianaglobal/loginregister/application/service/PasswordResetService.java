@@ -22,6 +22,7 @@ import com.dianaglobal.loginregister.domain.model.User;
 
 import lombok.RequiredArgsConstructor;
 
+@lombok.extern.slf4j.Slf4j
 @Service
 @RequiredArgsConstructor
 public class PasswordResetService {
@@ -94,7 +95,7 @@ public class PasswordResetService {
             passwordSetEmailService.sendChange(user.getEmail(), user.getName());
         } catch (Exception e) {
             // Log error but don't fail the reset process
-            System.err.println("Failed to send password reset confirmation email: " + e.getMessage());
+            log.warn("Failed to send password reset confirmation email: {}", e.getMessage());
         }
         // Alternatively: tokenRepo.deleteById(entity.getId());
     }

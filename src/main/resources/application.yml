@@ -32,7 +32,7 @@ brand:
 google:
   oauth:
     enabled: ${GOOGLE_OAUTH_ENABLED:false}  # defina true no Heroku quando quiser ativar
-    # GOOGLE_CLIENT_ID vem do ambiente (sem default aqui de propósito)
+    client-id: ${GOOGLE_CLIENT_ID}
 
 application:
   jwt:
