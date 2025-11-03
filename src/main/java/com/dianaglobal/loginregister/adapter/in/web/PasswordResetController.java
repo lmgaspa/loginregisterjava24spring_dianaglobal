@@ -4,6 +4,7 @@ package com.dianaglobal.loginregister.adapter.in.web;
 import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.password.ResetPasswordRequest;
 import com.dianaglobal.loginregister.application.service.PasswordResetService;
+import com.dianaglobal.loginregister.config.ApiPaths;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping(ApiPaths.AUTH_BASE)
 @RequiredArgsConstructor
 public class PasswordResetController {
 

@@ -3,6 +3,7 @@ package com.dianaglobal.loginregister.adapter.in.web;
 import com.dianaglobal.loginregister.adapter.in.dto.AuthResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.GenericTokenDTO;
 import com.dianaglobal.loginregister.application.service.AccountConfirmationService;
+import com.dianaglobal.loginregister.config.ApiPaths;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -13,7 +14,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/confirm")
+@RequestMapping(ApiPaths.CONFIRM_BASE)
 @RequiredArgsConstructor
 @Validated
 public class AccountConfirmationController {
