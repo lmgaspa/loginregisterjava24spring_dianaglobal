@@ -28,22 +28,24 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
-                // Stateless API (JWT em vez de sessão Http)
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // stateless API (JWT, nada de sessão server-side)
+                .sessionManagement(sm ->
+                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
 
-                // CSRF nativo desativado (você faz CSRF manual: header X-CSRF-Token vs cookie csrf_token)
+                // CSRF padrão do Spring desabilitado.
+                // A gente faz CSRF manualmente via header X-CSRF-Token + cookie httpOnly.
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // CORS config abaixo
+                // CORS usa o bean corsConfigurationSource() lá embaixo
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
-                        // Preflight
+                        // liberar todas as preflight OPTIONS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Swagger / docs / health / privacy público (ajuste se quiser trancar depois)
+                        // swagger / docs públicos (se você expõe isso)
                         .requestMatchers(
                                 "/",
                                 "/api/privacy/**",
@@ -55,14 +57,21 @@ public class SecurityConfig {
                                 "/api-docs/**"
                         ).permitAll()
 
-                        // Toda autenticação pública (login, register, forgot-password, refresh-token etc.)
-                        .requestMatchers(ApiPaths.AUTH_BASE + "/**").permitAll()
+                        // --- ROTAS PÚBLICAS DA V1 ---
+                        // login/register/oauth/refresh/etc
+                        .requestMatchers("/api/v1/auth/**").permitAll()
 
-                        // Qualquer outra rota exige JWT válido
+                        // confirmação de conta (request link, resend, verify)
+                        .requestMatchers("/api/v1/confirm/**").permitAll()
+
+                        // esqueci-minha-senha e reset já estão dentro de /api/v1/auth/**,
+                        // então já estão cobertas acima.
+
+                        // tudo o resto precisa de JWT válido
                         .anyRequest().authenticated()
                 )
 
-                // seu filtro JWT roda antes do UsernamePasswordAuthenticationFilter
+                // injeta seu filtro JWT pra validar Authorization: Bearer <token>
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -72,15 +81,17 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
-        // domínios autorizados (ajusta conforme produção)
+        // domínios que podem chamar sua API
         cfg.setAllowedOriginPatterns(List.of(
                 "https://www.dianaglobal.com.br",
                 "https://dianaglobal.com.br",
-                "http://localhost:3000"
+                "http://localhost:3000" // dev local
         ));
 
+        // métodos liberados
         cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
 
+        // headers que o front-end pode mandar
         cfg.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
@@ -90,13 +101,13 @@ public class SecurityConfig {
                 "Origin"
         ));
 
-        // precisamos mandar cookies (refresh_token, csrf_token)
+        // permitir cookies (refresh_token httpOnly + csrf_token)
         cfg.setAllowCredentials(true);
 
-        // expor header pro browser conseguir ler o novo CSRF e salvar no cookie JS
+        // headers que o browser PODE ENXERGAR na resposta (ex: nosso X-CSRF-Token)
         cfg.setExposedHeaders(List.of("X-CSRF-Token"));
 
-        // cache do preflight em segundos
+        // cache do preflight
         cfg.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
