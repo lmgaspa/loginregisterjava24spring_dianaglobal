@@ -28,22 +28,22 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
         http
-                // API stateless (JWT, sem sessão server-side)
+                // Stateless API (JWT em vez de sessão Http)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // CSRF nativo do Spring desativado.
-                // Você já faz proteção CSRF manual (token no header + cookie) nos POST/PUT protegidos.
+                // CSRF nativo desativado (você faz CSRF manual: header X-CSRF-Token vs cookie csrf_token)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Habilita CORS usando o bean corsConfigurationSource() lá embaixo
+                // CORS config abaixo
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
-                        // Preflight OPTIONS sempre liberado
+                        // Preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Swagger / health / privacy etc. público
+                        // Swagger / docs / health / privacy público (ajuste se quiser trancar depois)
                         .requestMatchers(
                                 "/",
                                 "/api/privacy/**",
@@ -55,21 +55,14 @@ public class SecurityConfig {
                                 "/api-docs/**"
                         ).permitAll()
 
-                        // 🔓 Endpoints públicos de auth/conta (com e sem /v1/)
-                        // login, register, forgot-password, reset-password,
-                        // refresh-token (usa refresh cookie httpOnly),
-                        // confirm (confirmar conta / resend),
-                        // email confirmation verify etc.
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/confirm/**").permitAll()
-                        .requestMatchers("/api/v1/confirm/**").permitAll()
+                        // Toda autenticação pública (login, register, forgot-password, refresh-token etc.)
+                        .requestMatchers(ApiPaths.AUTH_BASE + "/**").permitAll()
 
-                        // qualquer coisa que sobrou exige JWT válido
+                        // Qualquer outra rota exige JWT válido
                         .anyRequest().authenticated()
                 )
 
-                // coloca seu filtro JWT antes do UsernamePasswordAuthenticationFilter
+                // seu filtro JWT roda antes do UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -79,17 +72,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
-        // Domínios FRONTEND autorizados a chamar o backend
+        // domínios autorizados (ajusta conforme produção)
         cfg.setAllowedOriginPatterns(List.of(
                 "https://www.dianaglobal.com.br",
                 "https://dianaglobal.com.br",
-                "http://localhost:3000" // dev local
+                "http://localhost:3000"
         ));
 
-        // Métodos HTTP permitidos no CORS
-        cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+        cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
 
-        // Cabeçalhos que o browser pode mandar pro backend
         cfg.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
@@ -99,14 +90,13 @@ public class SecurityConfig {
                 "Origin"
         ));
 
-        // MUITO IMPORTANTE: permitir cookies (refresh-token cookie httpOnly)
+        // precisamos mandar cookies (refresh_token, csrf_token)
         cfg.setAllowCredentials(true);
 
-        // Cabeçalhos que o browser pode ENXERGAR na resposta
-        // (precisamos expor o X-CSRF-Token pro front salvar de volta)
+        // expor header pro browser conseguir ler o novo CSRF e salvar no cookie JS
         cfg.setExposedHeaders(List.of("X-CSRF-Token"));
 
-        // Cache do preflight no browser
+        // cache do preflight em segundos
         cfg.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
