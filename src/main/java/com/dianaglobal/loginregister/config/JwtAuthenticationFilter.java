@@ -1,11 +1,7 @@
 package com.dianaglobal.loginregister.config;
 
-import com.dianaglobal.loginregister.application.service.JwtService;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import java.io.IOException;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,7 +11,13 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
+import com.dianaglobal.loginregister.application.service.JwtService;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
@@ -25,16 +27,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
 
     private static boolean isPublicAuthPath(String path, String method) {
-        // somente estes endpoints não exigem JWT:
+        // somente estes endpoints não exigem JWT (usando /api/v1/auth conforme controllers):
         return
-                path.equals("/api/auth/login") ||
-                        path.equals("/api/auth/register") ||
-                        path.equals("/api/auth/confirm-account") ||
-                        path.equals("/api/auth/confirm/resend") ||
-                        path.equals("/api/auth/forgot-password") ||
-                        path.equals("/api/auth/reset-password") ||
-                        path.equals("/api/auth/oauth/google"); // se exposto
-        // OBS: /api/auth/profile NÃO entra aqui (é protegido)
+                path.equals("/api/v1/auth/login") ||
+                        path.equals("/api/v1/auth/register") ||
+                        path.equals("/api/v1/auth/confirm-account") ||
+                        path.equals("/api/v1/auth/confirm/resend") ||
+                        path.equals("/api/v1/auth/forgot-password") ||
+                        path.equals("/api/v1/auth/reset-password") ||
+                        path.equals("/api/v1/auth/oauth/google") ||
+                        // confirmação de conta em /api/v1/confirm
+                        path.equals("/api/v1/confirm/request") ||
+                        path.equals("/api/v1/confirm/verify") ||
+                        path.equals("/api/v1/confirm/resend"); // se exposto
+        // OBS: /api/v1/auth/profile NÃO entra aqui (é protegido)
     }
 
     @Override
