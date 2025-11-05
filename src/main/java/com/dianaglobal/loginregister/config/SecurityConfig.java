@@ -82,7 +82,8 @@ public class SecurityConfig {
         CorsConfiguration cfg = new CorsConfiguration();
 
         // domínios que podem chamar sua API
-        cfg.setAllowedOriginPatterns(List.of(
+        // IMPORTANTE: quando allowCredentials=true, use setAllowedOrigins (não setAllowedOriginPatterns)
+        cfg.setAllowedOrigins(List.of(
                 "https://www.dianaglobal.com.br",
                 "https://dianaglobal.com.br",
                 "http://localhost:3000" // dev local
