@@ -5,8 +5,6 @@ import com.dianaglobal.loginregister.adapter.in.dto.JwtResponse;
 import com.dianaglobal.loginregister.adapter.in.dto.OAuthGoogleRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginRequest;
 import com.dianaglobal.loginregister.adapter.in.dto.login.LoginResponse;
-import com.dianaglobal.loginregister.adapter.in.dto.password.ForgotPasswordRequest;
-import com.dianaglobal.loginregister.adapter.in.dto.password.ResetPasswordRequest;
 import com.dianaglobal.loginregister.adapter.in.web.util.AuthCookieUtil;
 import com.dianaglobal.loginregister.application.port.in.RegisterUserUseCase;
 import com.dianaglobal.loginregister.application.port.out.UserRepositoryPort;
@@ -57,7 +55,6 @@ public class SessionController {
     private final RegisterUserUseCase registerService;
     private final ConfirmationResendThrottleService confirmationResendThrottleService;
     private final AccountConfirmationService accountConfirmationService;
-    private final PasswordResetService passwordResetService;
     private final AuthCookieUtil authCookieUtil;
 
     @Autowired(required = false)
@@ -279,19 +276,10 @@ public class SessionController {
     // ------------------------------------------------------------------------------------
     // ESQUECI MINHA SENHA / RESET DE SENHA POR TOKEN
     // ------------------------------------------------------------------------------------
-    @PostMapping(value = "/forgot-password", consumes = "application/json")
-    public ResponseEntity<?> forgotPassword(@RequestBody @Valid ForgotPasswordRequest req) {
-        // dispara e-mail com link /reset-password?token=...
-        passwordResetService.requestReset(req.email(), frontendBaseUrl);
-        return ResponseEntity.noContent().build(); // 204
-    }
-
-    @PostMapping(value = "/reset-password", consumes = "application/json")
-    public ResponseEntity<?> resetPassword(@RequestBody @Valid ResetPasswordRequest req) {
-        // valida token e troca a senha
-        passwordResetService.resetPassword(req.token(), req.newPassword());
-        return ResponseEntity.ok().build();
-    }
+    // NOTA: Endpoints movidos para PasswordResetController para centralizar lógica
+    // e incluir validação de Google users sem senha
+    // /forgot-password -> PasswordResetController.forgot()
+    // /reset-password -> PasswordResetController.reset()
 
     // ------------------------------------------------------------------------------------
     // REENVIAR E-MAIL DE CONFIRMAÇÃO (COOLDOWN / LIMITES)
