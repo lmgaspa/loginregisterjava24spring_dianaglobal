@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -42,7 +43,11 @@ public class PasswordResetController {
         // Verificar se é Google user sem senha (mesma lógica do /login)
         if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Use Sign in with Google or set a password first."));
+                    .body(Map.of(
+                            "message", "Use Sign in with Google or set a password first.",
+                            "error", "PASSWORD_NOT_SET",
+                            "auth_provider", "GOOGLE"
+                    ));
         }
         
         // Caso contrário, processar normalmente

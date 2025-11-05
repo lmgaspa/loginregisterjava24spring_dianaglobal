@@ -83,7 +83,11 @@ public class SessionController {
         // se a conta veio do Google e não tem password setado, exigir login social
         if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Use Sign in with Google or set a password first."));
+                    .body(Map.of(
+                            "message", "Use Sign in with Google or set a password first.",
+                            "error", "PASSWORD_NOT_SET",
+                            "auth_provider", "GOOGLE"
+                    ));
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
