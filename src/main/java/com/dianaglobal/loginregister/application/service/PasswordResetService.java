@@ -83,15 +83,19 @@ public class PasswordResetService {
         var entity = tokenRepo.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, new Date())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired token"));
 
-        userRepo.updatePassword(entity.getUserId(), passwordEncoder.encode(newPassword));
+        // Buscar usuário e atualizar senha + password_set
+        User user = userRepo.findById(entity.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordSet(true); // ✅ Garantir que password_set seja true após reset
+        userRepo.save(user);
 
         entity.setUsedAt(new Date());
         tokenRepo.save(entity);
         
         // Send confirmation email after successful password reset
         try {
-            User user = userRepo.findById(entity.getUserId())
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
             passwordSetEmailService.sendChange(user.getEmail(), user.getName());
         } catch (Exception e) {
             // Log error but don't fail the reset process
