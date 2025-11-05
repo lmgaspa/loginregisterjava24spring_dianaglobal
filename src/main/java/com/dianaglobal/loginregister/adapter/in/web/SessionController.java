@@ -365,12 +365,13 @@ public class SessionController {
             @RequestHeader(name = "X-CSRF-Token", required = false) String csrfHeader,
             HttpServletResponse response
     ) {
+        // Verificar refresh token primeiro (401 = não autenticado)
         if (refreshCookie == null || refreshCookie.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Missing refresh cookie"));
         }
 
-        // validação de CSRF: header tem que bater com cookie
+        // validação de CSRF: header tem que bater com cookie (403 = não autorizado)
         if (!csrfTokenService.validateCsrfToken(csrfHeader, csrfCookie)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new MessageResponse("Invalid CSRF token"));
