@@ -85,19 +85,13 @@ public class PasswordResetService {
 
         // Buscar usuário e atualizar apenas a senha
         // NOTA: password_set não é alterado aqui - apenas atualiza a senha
-        // Se o usuário nunca teve senha (password_set=false), deve usar /set-unauthenticated
+        // O frontend é responsável por guiar o usuário ao endpoint correto baseado em password_set
         User user = userRepo.findById(entity.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         
-        // Validação: usuários Google sem senha devem usar /set-unauthenticated
-        if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
-            throw new IllegalArgumentException(
-                "Google users without password must use /password/set-unauthenticated endpoint"
-            );
-        }
-        
         user.setPassword(passwordEncoder.encode(newPassword));
         // password_set permanece como está (não alteramos aqui - apenas reset de senha esquecida)
+        // O frontend decide o comportamento baseado no valor de password_set retornado no perfil
         userRepo.save(user);
 
         entity.setUsedAt(new Date());
