@@ -59,15 +59,22 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // --- ROTAS PÚBLICAS DA V1 ---
-                        // login/register/oauth/refresh/etc
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        // login/register/oauth/refresh/etc (exceto /profile que é protegido)
+                        .requestMatchers(
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/oauth/google",
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password",
+                                "/api/v1/auth/confirm/resend",
+                                "/api/v1/auth/refresh-token"
+                        ).permitAll()
 
                         // confirmação de conta (request link, resend, verify)
                         .requestMatchers("/api/v1/confirm/**").permitAll()
 
-                        // esqueci-minha-senha e reset já estão dentro de /api/v1/auth/**,
-                        // então já estão cobertas acima.
-
+                        // --- ROTAS PROTEGIDAS ---
+                        // /api/v1/auth/profile e outros endpoints protegidos precisam de autenticação
                         // tudo o resto precisa de JWT válido
                         .anyRequest().authenticated()
                 )
