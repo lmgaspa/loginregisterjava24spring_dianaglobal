@@ -83,12 +83,21 @@ public class PasswordResetService {
         var entity = tokenRepo.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, new Date())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired token"));
 
-        // Buscar usuário e atualizar senha + password_set
+        // Buscar usuário e atualizar apenas a senha
+        // NOTA: password_set não é alterado aqui - apenas atualiza a senha
+        // Se o usuário nunca teve senha (password_set=false), deve usar /set-unauthenticated
         User user = userRepo.findById(entity.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         
+        // Validação: usuários Google sem senha devem usar /set-unauthenticated
+        if ("GOOGLE".equalsIgnoreCase(user.getAuthProvider()) && !user.isPasswordSet()) {
+            throw new IllegalArgumentException(
+                "Google users without password must use /password/set-unauthenticated endpoint"
+            );
+        }
+        
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setPasswordSet(true); // ✅ Garantir que password_set seja true após reset
+        // password_set permanece como está (não alteramos aqui - apenas reset de senha esquecida)
         userRepo.save(user);
 
         entity.setUsedAt(new Date());
