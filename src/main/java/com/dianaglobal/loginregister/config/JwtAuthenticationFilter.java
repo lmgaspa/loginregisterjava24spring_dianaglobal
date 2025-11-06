@@ -80,16 +80,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String jwt = authHeader.substring(7);
-        log.debug("[JWT FILTER] Processing token for {} {} - Token length: {}", method, path, jwt.length());
+        log.info("[JWT FILTER] Processing token for {} {} - Token length: {}, Token preview: {}...", 
+                method, path, jwt.length(), jwt.length() > 20 ? jwt.substring(0, 20) : jwt);
 
         try {
             final String email = jwtService.extractEmail(jwt);
-            log.debug("[JWT FILTER] Extracted email: {} for {} {}", email, method, path);
+            log.info("[JWT FILTER] Extracted email: {} for {} {}", email, method, path);
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-                    log.debug("[JWT FILTER] Token valid for {} {}", email, path);
+                    log.info("[JWT FILTER] Token valid for {} {}", email, path);
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails, null, userDetails.getAuthorities());

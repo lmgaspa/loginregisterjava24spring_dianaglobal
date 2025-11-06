@@ -173,9 +173,16 @@ public class SessionController {
             String refresh = refreshModel.getToken();
             String csrf = csrfTokenService.generateCsrfToken(user.getEmail());
 
+            log.info("[GOOGLE OAUTH SUCCESS] User: {} - Access token: {}... ({} chars), Refresh token: {}... ({} chars), CSRF: {}... ({} chars)",
+                    user.getEmail(), 
+                    access.length() > 20 ? access.substring(0, 20) : access, access.length(),
+                    refresh.length() > 10 ? refresh.substring(0, 10) : refresh, refresh.length(),
+                    csrf.length() > 10 ? csrf.substring(0, 10) : csrf, csrf.length());
+
             authCookieUtil.setAuthCookies(response, refresh, csrf);
             authCookieUtil.exposeCsrfHeader(response, csrf);
 
+            log.info("[GOOGLE OAUTH] Returning LoginResponse with accessToken for user: {}", user.getEmail());
             return ResponseEntity.ok(new LoginResponse(access, null));
 
         } catch (GeneralSecurityException e) {
