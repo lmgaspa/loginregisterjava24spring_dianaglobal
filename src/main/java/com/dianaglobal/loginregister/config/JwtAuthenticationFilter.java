@@ -18,7 +18,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -106,11 +108,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
 
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            log.warn("[JWT FILTER] Expired token for {} {} - Email: {}", method, path, e.getClaims().getSubject());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Token expired. Please login again.\"}");
+        } catch (io.jsonwebtoken.security.SignatureException e) {
+            log.warn("[JWT FILTER] Invalid signature for {} {} - Error: {}", method, path, e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Invalid token signature\"}");
+        } catch (io.jsonwebtoken.MalformedJwtException e) {
+            log.warn("[JWT FILTER] Malformed token for {} {} - Error: {}", method, path, e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Malformed token\"}");
         } catch (Exception e) {
             // Qualquer outro erro (token malformado, assinatura inválida, etc)
+            log.error("[JWT FILTER] Token validation error for {} {} - Error: {} - Class: {}", 
+                    method, path, e.getMessage(), e.getClass().getSimpleName(), e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Invalid authentication token\"}");
