@@ -123,8 +123,11 @@ public class AccountConfirmationService {
 
         var user = userOpt.get();
         if (user.isEmailConfirmed()) {
-            return new ResendResult(HttpStatus.OK, Map.of(
+            // Retornar 409 CONFLICT quando a conta já está confirmada
+            // Frontend espera este status para tratar o caso corretamente
+            return new ResendResult(HttpStatus.CONFLICT, Map.of(
                     "status", "ALREADY_CONFIRMED",
+                    "message", "Your account is already confirmed. You can sign in.",
                     "canResend", false,
                     "cooldownSecondsRemaining", 0,
                     "attemptsToday", 0,
