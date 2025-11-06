@@ -67,6 +67,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/confirm/resend",
+                                "/api/v1/auth/confirmed", // GET para verificar status de confirmação (público)
                                 "/api/v1/auth/refresh-token"
                         ).permitAll()
 
