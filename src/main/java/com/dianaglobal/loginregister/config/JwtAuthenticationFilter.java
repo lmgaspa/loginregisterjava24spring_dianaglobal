@@ -70,6 +70,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.warn("[JWT FILTER] Missing Authorization header for {} {} - Header: {}", 
+                    method, path, authHeader != null ? "present but invalid format" : "missing");
             // Rotas protegidas sem token -> retornar 401
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
@@ -78,13 +80,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String jwt = authHeader.substring(7);
+        log.debug("[JWT FILTER] Processing token for {} {} - Token length: {}", method, path, jwt.length());
 
         try {
             final String email = jwtService.extractEmail(jwt);
+            log.debug("[JWT FILTER] Extracted email: {} for {} {}", email, method, path);
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                 if (jwtService.isTokenValid(jwt, userDetails)) {
+                    log.debug("[JWT FILTER] Token valid for {} {}", email, path);
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails, null, userDetails.getAuthorities());
@@ -92,6 +97,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 } else {
                     // Token inválido (não expirado, mas inválido)
+                    log.warn("[JWT FILTER] Token invalid for {} {} - Email: {}", method, path, email);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Invalid authentication token\"}");
@@ -99,6 +105,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             } else {
                 // Não conseguiu extrair email do token (token malformado)
+                log.warn("[JWT FILTER] Could not extract email from token for {} {} - Email extracted: {}", method, path, email);
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Invalid authentication token\"}");
