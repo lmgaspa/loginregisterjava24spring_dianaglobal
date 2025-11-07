@@ -77,7 +77,7 @@ public class PasswordSetEmailService {
             title = "Account Complete";
             lead = "Your account has been successfully created and is now 100% configured";
             sub = "You can now sign in using both Google and your email/password combination. Your account is ready for full use!";
-            actionHref = branding.frontendUrl() + "/dashboard";
+            actionHref = branding.frontendUrl() + "/login";
             actionLabel = "Access your account";
             advisory = "Welcome to " + branding.brandName() + "! If you didn't request this, please contact support immediately.";
         } else if (firstDefinition) {
